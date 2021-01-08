@@ -26,3 +26,4 @@ _check_tf_version()
 __version__ = "v0.1.0"
 
 from tensorflow_recommenders_addons import dynamic_embedding
+from tensorflow_recommenders_addons.register import register_all
