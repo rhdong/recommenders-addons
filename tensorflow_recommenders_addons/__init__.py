@@ -19,7 +19,7 @@ preparation, model formulation, training, evaluation, and deployment.
 It's built on Keras and aims to have a gentle learning curve while still giving
 you the flexibility to build complex models.
 """
-from tensorflow_addons.utils.ensure_tf_install import _check_tf_version
+from tensorflow_recommenders_addons.utils.ensure_tf_install import _check_tf_version
 
 _check_tf_version()
 
