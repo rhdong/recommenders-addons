@@ -30,6 +30,12 @@ RUN --mount=type=cache,id=cache_pip,target=/root/.cache/pip \
 
 COPY ./ /recommenders-addons
 RUN pip install -e /recommenders-addons
+
+WORKDIR /recommenders-addons
+RUN python configure.py
+RUN --mount=type=cache,id=cache_bazel,target=/root/.cache/bazel \
+    bash tools/install_so_files.sh
+
 RUN pytest -v /recommenders-addons/tools/testing/
 RUN touch /ok.txt
 
