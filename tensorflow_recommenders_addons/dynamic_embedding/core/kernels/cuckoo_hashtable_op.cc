@@ -16,7 +16,6 @@ limitations under the License.
 #define EIGEN_USE_THREADS
 
 #include "cuckoo_hashtable_op.h"
-#include "tensorflow_recommenders_addons/dynamic_embedding/core/lib/cuckoo/cuckoohash_map.hh"
 
 #include <string>
 #include <type_traits>
@@ -28,6 +27,7 @@ limitations under the License.
 #include "tensorflow/core/kernels/lookup_table_op.h"
 #include "tensorflow/core/lib/gtl/inlined_vector.h"
 #include "tensorflow/core/util/work_sharder.h"
+#include "tensorflow_recommenders_addons/dynamic_embedding/core/lib/cuckoo/cuckoohash_map.hh"
 
 namespace tensorflow {
 namespace cuckoohash {
