@@ -129,7 +129,7 @@ class CuckooHashTableOfTensors final : public LookupInterface {
         ctx, TensorShapeUtils::IsVector(value_shape_),
         errors::InvalidArgument("Default value must be a vector, got shape ",
                                 value_shape_.DebugString()));
-    init_size_ = 1024 * 1024;
+    init_size_ = 1024 * 8;
     LOG(INFO) << "CPU CuckooHashTableOfTensors init: size = " << init_size_;
     table_ = new cuckoohash_map<K, ValueArray>(init_size_);
   }
