@@ -245,7 +245,7 @@ class HashTableOpKernel : public OpKernel {
         p.container(), p.name(), value);
   }
   Status GetResourceHashTable(StringPiece input_name, OpKernelContext* ctx,
-                                LookupInterface** table) {
+                              LookupInterface** table) {
     const Tensor* handle_tensor;
     TF_RETURN_IF_ERROR(ctx->input(input_name, &handle_tensor));
     const ResourceHandle& handle = handle_tensor->scalar<ResourceHandle>()();
@@ -427,14 +427,14 @@ REGISTER_KERNEL_BUILDER(Name("CuckooHashTableImport").Device(DEVICE_CPU),
                         HashTableImportOp);
 
 // Register the CuckooMutableHashTableOfTensors op.
-#define REGISTER_KERNEL(key_dtype, value_dtype)                                \
-  REGISTER_KERNEL_BUILDER(                                                     \
-      Name("CuckooHashTableOfTensors")                                         \
-          .Device(DEVICE_CPU)                                                  \
-          .TypeConstraint<key_dtype>("key_dtype")                              \
-          .TypeConstraint<value_dtype>("value_dtype"),                         \
+#define REGISTER_KERNEL(key_dtype, value_dtype)                             \
+  REGISTER_KERNEL_BUILDER(                                                  \
+      Name("CuckooHashTableOfTensors")                                      \
+          .Device(DEVICE_CPU)                                               \
+          .TypeConstraint<key_dtype>("key_dtype")                           \
+          .TypeConstraint<value_dtype>("value_dtype"),                      \
       HashTableOp<lookup::CuckooHashTableOfTensors<key_dtype, value_dtype>, \
-                    key_dtype, value_dtype>)
+                  key_dtype, value_dtype>)
 
 REGISTER_KERNEL(int32, double);
 REGISTER_KERNEL(int32, float);
