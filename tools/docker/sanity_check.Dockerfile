@@ -99,6 +99,11 @@ RUN apt-get update && apt-get install -y rsync
 
 COPY ./ /recommenders-addons
 WORKDIR /recommenders-addons
+
+RUN python configure.py
+RUN --mount=type=cache,id=cache_bazel,target=/root/.cache/bazel \
+    bash tools/install_so_files.sh
+
 RUN pip install --no-deps -e .
 RUN python tools/docs/build_docs.py
 RUN touch /ok.txt
