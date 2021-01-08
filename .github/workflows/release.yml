@@ -95,7 +95,7 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@v1.1.0
         with:
           user: __token__
-          password: ${{ secrets.pypƒi_token }}
+          password: ${{ secrets.pypi_token }}
   upload-dev-container:
     name: Upload dev container to DockerHub
     needs: [release-wheel, test-with-bazel]
