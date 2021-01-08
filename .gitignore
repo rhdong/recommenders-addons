@@ -19,3 +19,4 @@ artifacts/# File patterns to ignore; see `git help ignore` for more information.
 /tensorflow_recommenders_addons/dynamic_embedding/core/*.so
 
 bazel-genfiles
+!/pip-wheel-metadata/
