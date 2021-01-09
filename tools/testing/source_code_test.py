@@ -18,8 +18,6 @@ import os
 
 from typedapi import ensure_api_is_typed
 
-import tensorflow_recommenders_addons as tfra
-
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
 
@@ -165,5 +163,3 @@ def test_no_deprecated_v1():
                 "tf.compat. Please find an alternative using only the TF2.x API."
                 "".format(file_path, line_idx, line)
             )
-
-test_api_typed()
