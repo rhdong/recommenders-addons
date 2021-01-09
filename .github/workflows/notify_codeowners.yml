@@ -22,4 +22,4 @@ jobs:
           python .github/workflows/notify_codeowners.py \
               --pull-request-id=auto \
               --no-dry-run \
-              https://github.com/rhdong/recommenders-addons/blob/main/.github/CODEOWNERS
+              .github/CODEOWNERS
