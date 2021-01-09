@@ -1,7 +1,7 @@
 #syntax=docker/dockerfile:1.1.5-experimental
 FROM python:3.6 as build_wheel
 
-ARG TF_VERSION=2.3.0
+ARG TF_VERSION=2.2.0
 RUN pip install --default-timeout=1000 tensorflow-cpu==$TF_VERSION
 
 RUN apt-get update && apt-get install -y sudo rsync
@@ -30,7 +30,7 @@ RUN bazel-bin/build_pip_pkg artifacts
 FROM python:3.6
 
 COPY tools/install_deps/tensorflow-cpu.txt ./
-RUN pip install --default-timeout=1000 -r tensorflow-cpu.txt
+RUN pip install --default-timeout=1000 --upgrade --force-reinstall -r tensorflow-cpu.txt
 
 COPY --from=0 /recommenders-addons/artifacts /artifacts
 
