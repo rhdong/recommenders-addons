@@ -25,11 +25,10 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
 def test_api_typed():
     modules_list = [
-        tfra,
-        tfra.dynamic_embedding,
     ]
     # Files within this list will be exempt from verification.
-    exception_list = []
+    exception_list = [
+    ]
     help_message = (
         "You can also take a look at the section about it in the CONTRIBUTING.md:\n"
         "https://github.com/tensorflow/recommenders-addons/blob/master/CONTRIBUTING.md#about-type-hints"
@@ -75,36 +74,10 @@ def in_allowlist(file_path, allowlist):
     return False
 
 
-def test_no_private_tf_api():
-    # TODO: remove all elements of the list and remove the allowlist
-    # This allowlist should not grow. Do not add elements to this list.
-    allowlist = [
-        # "tensorflow_recommenders_addons/metrics/r_square.py",
-    ]
-
-    for file_path, line_idx, line in get_lines_of_source_code(allowlist):
-
-        if "import tensorflow.python" in line or "from tensorflow.python" in line:
-            raise ImportError(
-                "A private tensorflow API import was found in {} at line {}.\n"
-                "tensorflow.python refers to TensorFlow's internal source "
-                "code and private functions/classes.\n"
-                "The use of those is forbidden in Recommenders Addons for stability reasons."
-                "\nYou should find a public alternative or ask the "
-                "TensorFlow team to expose publicly the function/class "
-                "that you are using.\n"
-                "If you're trying to do `import tensorflow.python.keras` "
-                "it can be replaced with `import tensorflow.keras`."
-                "".format(file_path, line_idx + 1)
-            )
-
-
 def test_no_tf_cond():
     # TODO: remove all elements of the list and remove the allowlist
     # This allowlist should not grow. Do not add elements to this list.
-    allowlist = [
-        # "tensorflow_recommenders_addons/**/*",
-    ]
+    allowlist = []
     for file_path, line_idx, line in get_lines_of_source_code(allowlist):
 
         if "tf.cond(" in line:
@@ -179,9 +152,7 @@ def test_no_tf_control_dependencies():
 def test_no_deprecated_v1():
     # TODO: remove all elements of the list and remove the allowlist
     # This allowlist should not grow. Do not add elements to this list.
-    allowlist = [
-        # "tensorflow_recommenders_addons/**/*",
-    ]
+    allowlist = []
     for file_path, line_idx, line in get_lines_of_source_code(allowlist):
 
         if "tf.compat.v1" in line:
@@ -194,3 +165,5 @@ def test_no_deprecated_v1():
                 "tf.compat. Please find an alternative using only the TF2.x API."
                 "".format(file_path, line_idx, line)
             )
+
+test_api_typed()
