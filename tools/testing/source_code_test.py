@@ -22,11 +22,9 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
 
 def test_api_typed():
-    modules_list = [
-    ]
+    modules_list = []
     # Files within this list will be exempt from verification.
-    exception_list = [
-    ]
+    exception_list = []
     help_message = (
         "You can also take a look at the section about it in the CONTRIBUTING.md:\n"
         "https://github.com/tensorflow/recommenders-addons/blob/master/CONTRIBUTING.md#about-type-hints"
