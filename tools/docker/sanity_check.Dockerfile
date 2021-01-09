@@ -28,8 +28,18 @@ RUN --mount=type=cache,id=cache_pip,target=/root/.cache/pip \
     -r typedapi.txt \
     -r pytest.txt
 
+RUN apt-get update && apt-get install -y sudo rsync
+COPY tools/install_deps/install_bazelisk.sh .bazelversion ./
+RUN bash install_bazelisk.sh
+
 COPY ./ /recommenders-addons
 RUN pip install -e /recommenders-addons
+
+WORKDIR /recommenders-addons
+RUN python configure.py
+RUN --mount=type=cache,id=cache_bazel,target=/root/.cache/bazel \
+    bash tools/install_so_files.sh
+
 RUN pytest -v /recommenders-addons/tools/testing/
 RUN touch /ok.txt
 
@@ -89,10 +99,17 @@ RUN pip install -r requirements.txt
 COPY tools/install_deps/doc_requirements.txt ./
 RUN pip install -r doc_requirements.txt
 
-RUN apt-get update && apt-get install -y rsync
+RUN apt-get update && apt-get install -y sudo rsync
+COPY tools/install_deps/install_bazelisk.sh .bazelversion ./
+RUN bash install_bazelisk.sh
 
 COPY ./ /recommenders-addons
 WORKDIR /recommenders-addons
+
+RUN python configure.py
+RUN --mount=type=cache,id=cache_bazel,target=/root/.cache/bazel \
+    bash tools/install_so_files.sh
+
 RUN pip install --no-deps -e .
 RUN python tools/docs/build_docs.py
 RUN touch /ok.txt
