@@ -2,7 +2,7 @@
 
 ignore =
     # defaults flake8 ignores
-    E111,E114,E121,E123,E125,E126,E226,E24,E704,W503,W504
+    E121,E123,E126,E226,E24,E704,W503,W504
     # whitespace before ':'
     # https://black.readthedocs.io/en/stable/the_black_code_style.html#slices
     E203

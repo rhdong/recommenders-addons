@@ -13,6 +13,7 @@ import json
 WRITE_ACCESS_LIST = [
     "tensorflow/sig-recommenders-addons-maintainers",
     "rhdong",
+    "yuefengz",
     "tanzhenyu",
 ]
 
