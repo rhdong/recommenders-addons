@@ -86,10 +86,7 @@ jobs:
         # TODO: add back 'Windows' when it can be compiled.
         os: ['macOS', 'Linux']
         py-version: ['3.6', '3.7', '3.8']
-        tf-version: ['1.15.5', '2.3.0', '2.4.0']
-        exclude:
-          - py-version: '3.8'
-            tf-version: '1.15.5'
+        tf-version: ['2.4.0']
       fail-fast: false
     if: (github.event_name == 'push' && github.ref == 'refs/heads/master') || github.event_name == 'release'
     steps:
@@ -104,7 +101,8 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@v1.1.0
         with:
           user: __token__
-          password: ${{ secrets.pypi_token }}
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository_url: https://test.pypi.org/legacy/
   upload-dev-container:
     name: Upload dev container to DockerHub
     needs: [release-wheel, test-with-bazel]
