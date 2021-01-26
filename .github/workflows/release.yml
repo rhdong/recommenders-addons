@@ -39,7 +39,7 @@ jobs:
     strategy:
       matrix:
         # TODO: add back 'windows-latest' when it can be compiled.
-        os: ['macos-latest', 'ubuntu-18.04']
+        os: ['macos-latest', 'windows-latest', 'ubuntu-18.04']
         py-version: ['3.6', '3.7', '3.8']
         tf-version: ['1.15.5', '2.3.0', '2.4.0']
         exclude:
@@ -84,7 +84,7 @@ jobs:
     strategy:
       matrix:
         # TODO: add back 'Windows' when it can be compiled.
-        os: ['macOS', 'Linux']
+        os: ['macOS', 'Windows', 'Linux']
         py-version: ['3.6', '3.7', '3.8']
         tf-version: ['2.4.0']
       fail-fast: false
