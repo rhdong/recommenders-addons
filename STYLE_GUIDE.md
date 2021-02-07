@@ -28,27 +28,20 @@ clang-format-9 -i --style=google **/*.cc **/*.h
 ```
 
 #### Python
-
-Addons uses [flake8](http://flake8.pycqa.org/en/latest/) to check pep8 compliance and 
-code analysis.
-
-Addons use [Black](https://black.readthedocs.io/en/stable/) to format our code.
+Recommenders Addons use [Yapf](https://github.com/google/yapf) to format our code.
 The continuous integration check will fail if you do not use it.
 
 Install them with:
 ```
-pip install flake8 black
+pip install yapf
 ```
 
-Be sure to run them both before you push your commits, otherwise the CI will fail!
+Be sure to run it before you push your commits, otherwise the CI will fail!
 
 ```
-python -m black ./
-python -m flake8
+yapf --style=./.style.yapf -ir ./**/*.py
 ```
 
 #### TensorFlow Conventions
 
 Follow the guidance in the [TensorFlow Style Guide - Conventions](https://www.tensorflow.org/community/contribute/code_style#tensorflow_conventions_and_special_uses).
-
-Please note that Addons follows the conventions of the TensorFlow library, but formats our code using [PEP8](https://www.python.org/dev/peps/pep-0008/) guidelines.
