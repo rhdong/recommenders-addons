@@ -606,7 +606,7 @@ def embedding_lookup_sparse(
       segment_ids = math_ops.cast(segment_ids, dtypes.int32)
 
     ids = sp_ids.values
-    ids, idx = array_ops.unique(ids)
+    ids, idx = de.unique(ids)
 
     embeddings, trainable_ = embedding_lookup(
         params,

@@ -13,3 +13,12 @@ custom_op_library(
     ],
     deps = ["//tensorflow_recommenders_addons/dynamic_embedding/core/lib/cuckoo:cuckoohash"],
 )
+
+custom_op_library(
+    name = "_gen_array_ops.so",
+    srcs = [
+        "kernels/unique_op.cc",
+        "ops/array_ops.cc",
+    ],
+    deps = ["//third_party/deepx_core:deepx_core"],
+)

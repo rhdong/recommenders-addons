@@ -59,3 +59,13 @@ py_test(
         "//tensorflow_recommenders_addons",
     ],
 )
+
+py_test(
+    name = "unique_op_test",
+    srcs = ["unique_op_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        "//tensorflow_recommenders_addons",
+    ],
+)
