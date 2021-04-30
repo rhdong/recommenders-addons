@@ -15,7 +15,8 @@ limitations under the License.
 
 #define EIGEN_USE_THREADS
 
-#include "cuckoo_hashtable_op.h"
+#include "tensorflow_recommenders_addons/dynamic_embedding/core/kernels/cuckoo_hashtable_op.h"
+#include "tensorflow_recommenders_addons/dynamic_embedding/core/kernels/lookup_impl/lookup_table_op_cpu.h"
 
 #include <string>
 #include <type_traits>
@@ -23,7 +24,6 @@ limitations under the License.
 
 #include "tensorflow/core/kernels/lookup_table_op.h"
 #include "tensorflow/core/util/work_sharder.h"
-#include "tensorflow_recommenders_addons/dynamic_embedding/core/kernels/lookup_impl/lookup_table_op_cpu.h"
 
 namespace tensorflow {
 namespace recommenders_addons {
