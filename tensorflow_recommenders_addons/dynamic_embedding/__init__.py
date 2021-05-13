@@ -36,10 +36,14 @@ __all__ = [
 ]
 
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops import math_ops as math
+from tensorflow_recommenders_addons.dynamic_embedding.python.ops.redis_ops.macaw_hashtable_ops import (
+    MacawHashTable,)
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.cuckoo_hashtable_ops import (
     CuckooHashTable,)
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embedding_factory import (
-    TableFactory,)
+    TableFactory,
+    TableFactoryMeta,
+    )
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embedding_optimizer import (
     create_slots,)
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embedding_optimizer import (
