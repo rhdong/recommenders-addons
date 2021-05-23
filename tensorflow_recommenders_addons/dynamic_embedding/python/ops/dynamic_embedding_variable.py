@@ -151,7 +151,6 @@ class Variable(trackable.TrackableResource):
       checkpoint=True,
       init_size=0,
       restrict_policy=None,
-      table_fn="CuckooHashTable",
   ):
     """Creates an empty `Variable` object.
 
@@ -201,7 +200,6 @@ class Variable(trackable.TrackableResource):
         Returns:
           A `Variable` object.
         """
-    self.table_fn = table_fn
     self.key_dtype = key_dtype
     self.value_dtype = value_dtype
     self.dim = dim
@@ -265,8 +263,7 @@ class Variable(trackable.TrackableResource):
         for idx in range(len(self.devices)):
           with ops.device(self.devices[idx]):
             mht = None
-            mht = de.TableFactory(
-                table_fn=self.table_fn,
+            mht = de.KVcreator.instance(
                 key_dtype=self.key_dtype,
                 value_dtype=self.value_dtype,
                 default_value=static_default_value,
@@ -526,7 +523,6 @@ def get_variable(
     checkpoint=True,
     init_size=0,
     restrict_policy=None,
-    table_fn="CuckooHashTable",
 ):
   """Gets an `Variable` object with this name if it exists,
          or create a new one.
@@ -592,7 +588,6 @@ def get_variable(
         checkpoint=checkpoint,
         init_size=init_size,
         restrict_policy=restrict_policy,
-        table_fn=table_fn,
     )
     scope_store._vars[full_name] = var_
   return scope_store._vars[full_name]
