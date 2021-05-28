@@ -27,7 +27,7 @@ leading dimension of the size of the embeddings.
 #### Args:
 
 * <b>`params`</b>: A dynamic_embedding.Variable instance.
-* <b>`ids`</b>: a tensor with any shape as same dtype of params.key_dtype.
+* <b>`ids`</b>: A tensor with any shape as same dtype of params.key_dtype.
 * <b>`partition_strategy`</b>: No used, for API compatiblity with `nn.emedding_lookup`.
 * <b>`name`</b>: A name for the operation (optional).
 * <b>`validate_indices`</b>: No used, just for compatible with nn.embedding_lookup .

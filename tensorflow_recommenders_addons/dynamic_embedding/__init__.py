@@ -14,6 +14,7 @@
 # ==============================================================================
 """Export dynamic_embedding APIs."""
 
+from tensorflow_recommenders_addons.dynamic_embedding.python.ops import math_ops as math
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.cuckoo_hashtable_ops import (
     CuckooHashTable,)
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embedding_optimizer import (
@@ -22,6 +23,8 @@ from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embeddi
     DynamicEmbeddingOptimizer,)
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embedding_ops import (
     embedding_lookup,)
+from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embedding_ops import (
+    embedding_lookup_unique,)
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embedding_ops import (
     embedding_lookup_sparse,)
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embedding_ops import (
@@ -40,13 +43,13 @@ from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embeddi
     get_variable,)
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embedding_variable import (
     Variable,)
+from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embedding_variable import (
+    GraphKeys,)
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.restrict_policies import (
     RestrictPolicy,
     TimestampRestrictPolicy,
     FrequencyRestrictPolicy,
 )
-from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embedding_variable import (
-    GraphKeys,)
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.tf_patch import (
     patch_on_tf,)
 

@@ -24,6 +24,7 @@ from __future__ import print_function
 
 from tensorflow_recommenders_addons import dynamic_embedding as de
 
+from tensorflow.python import _pywrap_util_port
 from tensorflow.python.client import device_lib
 from tensorflow.python.eager import context
 from tensorflow.python.framework import constant_op
@@ -36,6 +37,7 @@ from tensorflow.python.ops import data_flow_ops
 from tensorflow.python.ops import init_ops
 from tensorflow.python.ops import init_ops_v2
 from tensorflow.python.ops import math_ops
+from tensorflow.python.ops import string_ops
 from tensorflow.python.ops import variable_scope
 from tensorflow.python.platform import tf_logging
 from tensorflow.python.training.tracking import tracking as trackable
@@ -87,14 +89,22 @@ def default_partition_fn(keys, shard_num):
         represents the corresponding partition-ids of keys.
     """
   keys_op = ops.convert_to_tensor(keys, name="keys")
+  gpu_mode = _pywrap_util_port.IsGoogleCudaEnabled()
+
   with ops.colocate_with(keys_op):
-    if keys_op.dtype == dtypes.int64:
-      mask = constant_op.constant(0x7FFFFFFF, dtypes.int64)
+    if keys_op.dtype == dtypes.int64 and gpu_mode:
+      # This branch has low performance on some multi-CPU scenario,
+      # so we try to use default branch when GPUs are not available.
+      mask = constant_op.constant(0x7fffffff, dtypes.int64)
       keys_int32 = math_ops.cast(bitwise_ops.bitwise_and(keys_op, mask),
                                  dtypes.int32)
       mod = math_ops.mod(keys_int32,
                          constant_op.constant(shard_num, dtypes.int32))
       ids = math_ops.cast(mod, dtype=dtypes.int32)
+    elif keys_op.dtype == dtypes.string:
+      ids = string_ops.string_to_hash_bucket_fast(keys_op, shard_num)
+      mask = constant_op.constant(0x7fffffff, dtypes.int64)
+      ids = math_ops.cast(bitwise_ops.bitwise_and(ids, mask), dtypes.int32)
     else:
       ids = math_ops.cast(math_ops.mod(keys_op, shard_num), dtype=dtypes.int32)
   return ids
@@ -140,19 +150,22 @@ class Variable(trackable.TrackableResource):
   ):
     """Creates an empty `Variable` object.
 
-        Creates a group of tables placed on devices,
+        Creates a group of tables placed on devices specified by `devices`,
+        and the device placement mechanism of TensorFlow will be ignored,
         the type of its keys and values are specified by key_dtype
         and value_dtype, respectively.
         The environment variables 'TF_HASHTABLE_INIT_SIZE' can be used to set the
         inital size of each tables, which can help reduce rehash times.
-        The default initial table size : 1,048,576 for CPU, 16,777,216 for GPU.
+        The default initial table size is 8,192
 
         Args:
           key_dtype: the type of the key tensors.
           value_dtype: the type of the value tensors.
-          dim: the length of the value array for each key.
+          dim: the length of the value array for each key,
+            on GPUs, `dim` should be less or equal to 200.
           devices: the list of devices holding the tables.
-            One table will be created on each device.
+            One table will be created on each device. By default, `devices` is
+            ['/CPU:0'] and when GPU is available, `devices` is ['/GPU:0']
           partitioner: partition function of keys,
             return the partition index for each key.
 
@@ -173,7 +186,7 @@ class Variable(trackable.TrackableResource):
             saved to and restored from checkpoints.
             If `shared_name` is empty for a checkpointed table,
             it is shared using the table node name.
-          init_size: initial size for the Variable and initial size of each hash 
+          init_size: initial size for the Variable and initial size of each hash
             tables will be int(init_size / N), N is the number of the devices.
           restrict_policy: a restrict policy to specify the rule to restrict the
             size of variable. If in training program, the variable is updated by
@@ -213,7 +226,7 @@ class Variable(trackable.TrackableResource):
     self._tables = []
     self.size_ops = []
     self.shard_num = len(self.devices)
-    self.init_size = int(init_size / self.shard_num)
+    self.init_size = int(init_size)
     if restrict_policy is not None:
       if not issubclass(restrict_policy, de.RestrictPolicy):
         raise TypeError('restrict_policy must be subclass of RestrictPolicy.')
@@ -221,15 +234,10 @@ class Variable(trackable.TrackableResource):
     else:
       self._restrict_policy = None
 
-    key_dtype_list = [dtypes.int32, dtypes.int64]
+    key_dtype_list = [dtypes.int32, dtypes.int64, dtypes.string]
     value_dtype_list = [
-        dtypes.int32,
-        dtypes.int64,
-        dtypes.bool,
-        dtypes.float32,
-        dtypes.float64,
-        dtypes.half,
-        dtypes.int8,
+        dtypes.int32, dtypes.int64, dtypes.bool, dtypes.float32, dtypes.float64,
+        dtypes.half, dtypes.int8, dtypes.string
     ]
     if "GPU" in self.devices[0].upper():
       key_dtype_list = [dtypes.int64]
@@ -257,7 +265,7 @@ class Variable(trackable.TrackableResource):
                 default_value=static_default_value,
                 name=self._make_name(idx),
                 checkpoint=self.checkpoint,
-                init_size=self.init_size,
+                init_size=int(self.init_size / self.shard_num),
             )
 
             self._tables.append(mht)
@@ -284,11 +292,11 @@ class Variable(trackable.TrackableResource):
         init = init(shape=[1])
       else:
         init = init()
-    init = math_ops.cast(
-        array_ops.fill([dim],
-                       array_ops.reshape(init, [-1])[0]),
-        dtype=self.value_dtype,
-    )
+    try:
+      init = array_ops.reshape(init, [dim])
+    except:
+      init = array_ops.fill([dim], array_ops.reshape(init, [-1])[0])
+    init = math_ops.cast(init, dtype=self.value_dtype)
     return init
 
   def _create_resource(self):

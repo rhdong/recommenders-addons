@@ -22,12 +22,12 @@ import logging
 
 import tensorflow as tf
 
-_TFA_BAZELRC = ".bazelrc"
+_TFRA_BAZELRC = ".bazelrc"
 
 
 # Writes variables to bazelrc file
 def write(line):
-  with open(_TFA_BAZELRC, "a") as f:
+  with open(_TFRA_BAZELRC, "a") as f:
     f.write(line + "\n")
 
 
@@ -92,12 +92,51 @@ def get_shared_lib_name():
     return namespec[1][3:]
 
 
+def get_tf_version():
+  """
+  Get Tensorflow version as a 4 digits string.
+
+  For example:
+    1.15.2 get 1152
+    2.4.1 get 2041
+
+  The 4-digits-string will be passed to C macro to discriminate different
+  Tensorflow versions. 
+
+  We assume that major version has 1 digit, minor version has 2 digits. And
+  patch version has 1 digit.
+  """
+  version = tf.__version__
+  try:
+    major, minor, patch = version.split('.')
+    assert len(
+        major
+    ) == 1, "Tensorflow major version must be length of 1. Version: {}".format(
+        version)
+    assert len(
+        minor
+    ) <= 2, "Tensorflow minor version must be less or equal to 2. Version: {}".format(
+        version)
+    assert len(
+        patch
+    ) == 1, "Tensorflow patch version must be length of 1. Version: {}".format(
+        version)
+  except:
+    raise ValueError('got wrong tf.__version__: {}'.format(version))
+  tf_version_num = str(int(major) * 1000 + int(minor) * 10 + int(patch))
+  if len(tf_version_num) != 4:
+    raise ValueError('Tensorflow version flag must be length of 4 (major'
+                     ' version: 1, minor version: 2, patch_version: 1). But'
+                     ' get: {}'.format(tf_version_num))
+  return tf_version_num
+
+
 def create_build_configuration():
   print()
   print("Configuring TensorFlow Recommenders-Addons to be built from source...")
 
-  if os.path.isfile(_TFA_BAZELRC):
-    os.remove(_TFA_BAZELRC)
+  if os.path.isfile(_TFRA_BAZELRC):
+    os.remove(_TFRA_BAZELRC)
 
   logging.disable(logging.WARNING)
 
@@ -105,6 +144,11 @@ def create_build_configuration():
   write_action_env("TF_SHARED_LIBRARY_DIR", get_tf_shared_lib_dir())
   write_action_env("TF_SHARED_LIBRARY_NAME", get_shared_lib_name())
   write_action_env("TF_CXX11_ABI_FLAG", tf.sysconfig.CXX11_ABI_FLAG)
+
+  tf_version = get_tf_version()
+  # This is used to trace the difference between Tensorflow versions.
+  # TODO(Lifann) write them to enviroment variables.
+  write_action_env("TF_VERSION", tf_version)
 
   write("build --spawn_strategy=standalone")
   write("build --strategy=Genrule=standalone")
@@ -115,9 +159,10 @@ def create_build_configuration():
     write("build:windows --enable_runfiles")
     write("build:windows --copt=/experimental:preprocessor")
     write("build:windows --host_copt=/experimental:preprocessor")
-    write("build:windows --copt=/arch=AVX2")
-    # write("build:windows --cxxopt=/std:c++14")
-    # write("build:windows --host_cxxopt=/std:c++14")
+    write("build:windows --copt=/arch=AVX")
+
+  if is_macos() or is_linux():
+    write("build --copt=-mavx")
 
   if os.getenv("TF_NEED_CUDA", "0") == "1":
     print("> Building GPU & CPU ops")
@@ -126,8 +171,8 @@ def create_build_configuration():
     print("> Building only CPU ops")
 
   print()
-  print("Build configurations successfully written to", _TFA_BAZELRC, ":\n")
-  print(pathlib.Path(_TFA_BAZELRC).read_text())
+  print("Build configurations successfully written to", _TFRA_BAZELRC, ":\n")
+  print(pathlib.Path(_TFRA_BAZELRC).read_text())
 
 
 def configure_cuda():
@@ -138,8 +183,8 @@ def configure_cuda():
       "CUDNN_INSTALL_PATH",
       os.getenv("CUDNN_INSTALL_PATH", "/usr/lib/x86_64-linux-gnu"),
   )
-  write_action_env("TF_CUDA_VERSION", os.getenv("TF_CUDA_VERSION", "10.1"))
-  write_action_env("TF_CUDNN_VERSION", os.getenv("TF_CUDNN_VERSION", "7"))
+  write_action_env("TF_CUDA_VERSION", os.getenv("TF_CUDA_VERSION", "11"))
+  write_action_env("TF_CUDNN_VERSION", os.getenv("TF_CUDNN_VERSION", "8"))
 
   write("test --config=cuda")
   write("build --config=cuda")
