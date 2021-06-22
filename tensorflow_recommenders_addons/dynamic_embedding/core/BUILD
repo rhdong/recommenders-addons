@@ -63,7 +63,9 @@ custom_op_library(
 custom_op_library(
     name = "_redis_table_ops.so",
     srcs = [
+        "kernels/redis/redis_impl/redis_connection_util.hpp",
         "kernels/redis/redis_impl/redis_connection_pool.hpp",
+        "kernels/redis/redis_impl/redis_cluster_connection_pool.hpp",
         "kernels/redis/redis_table_op.h",
         "kernels/redis/redis_table_op.cc",
         "ops/redis_table_ops.cc",
@@ -72,5 +74,5 @@ custom_op_library(
         "@redis//:HIREDIS",
         "@redis//:REDIS++",
     ]   ,
-    copts = ["-pthread", "-O3", "-mavx", "-mavx2", "-mavx512f", "-mfma"],
+    copts = ["-pthread", "-O3", "-mavx2", "-mavx512f", "-mfma"],
 )
