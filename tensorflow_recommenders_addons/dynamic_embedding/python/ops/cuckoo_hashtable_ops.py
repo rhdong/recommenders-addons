@@ -57,7 +57,8 @@ class CuckooHashTable(LookupInterface):
       default_value,
       name="CuckooHashTable",
       checkpoint=True,
-      params_dict={},
+      init_size=0,
+      config=None,
   ):
     """Creates an empty `CuckooHashTable` object.
 
@@ -87,7 +88,7 @@ class CuckooHashTable(LookupInterface):
     self._checkpoint = checkpoint
     self._key_dtype = key_dtype
     self._value_dtype = value_dtype
-    self._init_size = params_dict["init_size"]
+    self._init_size = init_size
     self._name = name
 
     self._shared_name = None

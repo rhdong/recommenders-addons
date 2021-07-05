@@ -23,17 +23,18 @@ import functools
 from hashlib import new
 from numpy.core.fromnumeric import ndim
 
-import tensorflow as tf 
+import tensorflow as tf
 from tensorflow.python.eager import context
 from tensorflow.python.framework import dtypes, ops
 from tensorflow.python.keras.utils.generic_utils import default
 from tensorflow.python.ops.lookup_ops import LookupInterface
 from tensorflow.python.training.saver import BaseSaverBuilder
+from tensorflow_recommenders_addons.dynamic_embedding.python.ops.dynamic_embedding_creator import RedisTableConfig
 
 from tensorflow_recommenders_addons.utils.resource_loader import LazySO
 
-redis_table_ops = LazySO(
-    "dynamic_embedding/core/_redis_table_ops.so").ops
+redis_table_ops = LazySO("dynamic_embedding/core/_redis_table_ops.so").ops
+
 
 class RedisTable(LookupInterface):
   """A generic mutable hash table implementation.
@@ -53,31 +54,6 @@ class RedisTable(LookupInterface):
     ```
     """
 
-  default_redis_params={
-    "connection_mode":1, # ClusterMode = 0, SentinelMode = 1, StreamMode = 2
-    "master_name":"master",
-    # connection_options
-    "host_ip":"127.0.0.1",
-    "host_port":26379,
-    "password":"",
-    "db":0,
-    "connect_timeout":1000, # milliseconds
-    "socket_timeout":1000,  # milliseconds
-    # connection_pool_options
-    "pool_size":20,
-    "wait_timeout":100000000,  # milliseconds
-    "connection_lifetime":100, # minutes
-    # sentinel_connection_options
-    "sentinel_connect_timeout":1000, # milliseconds
-    "sentinel_socket_timeout":1000,  # milliseconds
-    # Below there is user-defined parameters in this custom op, not Redis setting parameters
-    "storage_slice":1, # For deciding hash tag, which usually is how many Redis instance may be used in the trainning.
-    "using_MD5_prefix_name":False, # 1=true, 0=false
-    "model_tag":"test", #  model_tag for version and any other information
-    "using_model_lib":True,
-    "model_lib_abs_dir":"/tmp/",
-  }
-
   already_import_from_files = False
 
   def __init__(
@@ -87,29 +63,29 @@ class RedisTable(LookupInterface):
       default_value,
       name="RedisTable",
       checkpoint=False,
-      params_dict={},
+      config=RedisTableConfig(),  # default use default configuration
   ):
     """Creates an empty `RedisTable` object.
 
-        Creates a redis table through OS envionment variables, 
-        the type of its keys and values are specified by key_dtype 
-        and value_dtype, respectively.
+      Creates a redis table through OS envionment variables,
+      the type of its keys and values are specified by key_dtype
+      and value_dtype, respectively.
 
-        Args:
-          key_dtype: the type of the key tensors.
-          value_dtype: the type of the value tensors.
-          default_value: The value to use if a key is missing in the table.
-          name: A name for the operation (optional, usually it's embedding table name).
-          checkpoint: if True, the contents of the table are saved to and restored
-            from a Redis binary dump files according to the directory "[model_lib_abs_dir]/[model_tag]/[name].rdb". 
-            If `shared_name` is empty for a checkpointed table, it is shared using the table node name.
+      Args:
+        key_dtype: the type of the key tensors.
+        value_dtype: the type of the value tensors.
+        default_value: The value to use if a key is missing in the table.
+        name: A name for the operation (optional, usually it's embedding table name).
+        checkpoint: if True, the contents of the table are saved to and restored
+          from a Redis binary dump files according to the directory "[model_lib_abs_dir]/[model_tag]/[name].rdb".
+          If `shared_name` is empty for a checkpointed table, it is shared using the table node name.
 
-        Returns:
-          A `RedisTable` object.
+      Returns:
+        A `RedisTable` object.
 
-        Raises:
-          ValueError: If checkpoint is True and no name was specified.
-        """
+      Raises:
+        ValueError: If checkpoint is True and no name was specified.
+    """
     self._default_value = ops.convert_to_tensor(default_value,
                                                 dtype=value_dtype)
     self._value_shape = self._default_value.get_shape()
@@ -117,19 +93,22 @@ class RedisTable(LookupInterface):
     self._key_dtype = key_dtype
     self._value_dtype = value_dtype
     self._name = name
-    self._embedding_name = (self._name.split('_mht_',1))[0]
+    self._embedding_name = (self._name.split('_mht_', 1))[0]
     print(self._name)
     print(self._embedding_name)
-    self._redis_params = self.default_redis_params.copy()
-    self._redis_params = {k:v for k, v in params_dict.items() if k in self.default_redis_params}
+    self.config = config
 
-    os.environ["connect_timeout"]=str(self._redis_params["connect_timeout"])
-    os.environ["socket_timeout"]=str(self._redis_params["socket_timeout"])
-    os.environ["pool_size"]=str(self._redis_params["pool_size"])
-    os.environ["wait_timeout"]=str(self._redis_params["wait_timeout"])
-    os.environ["connection_lifetime"]=str(self._redis_params["connection_lifetime"])
-    os.environ["sentinel_connect_timeout"]=str(self._redis_params["sentinel_connect_timeout"])
-    os.environ["sentinel_socket_timeout"]=str(self._redis_params["sentinel_socket_timeout"])
+    os.environ["redis_connect_timeout"] = self.config.connect_timeout
+    os.environ["redis_socket_timeout"] = self.config.socket_timeout
+    os.environ["redis_pool_size"] = self.config.pool_size
+    os.environ["redis_wait_timeout"] = \
+      self.config.wait_timeout
+    os.environ["redis_connection_lifetime"] = \
+      self.config.connection_lifetime
+    os.environ["redis_sentinel_connect_timeout"] = \
+      self.config.sentinel_connect_timeout
+    os.environ["redis_sentinel_socket_timeout"] = \
+      self.config.sentinel_socket_timeout
 
     self._shared_name = None
     if context.executing_eagerly():
@@ -152,12 +131,11 @@ class RedisTable(LookupInterface):
         )
         ops.add_to_collection(ops.GraphKeys.SAVEABLE_OBJECTS, self.saveable)
       else:
-        self.saveable = RedisTable._Saveable(self,
-                                                  name=name,
-                                                  full_name=name)
-    
-    if self._redis_params["using_model_lib"] and self.already_import_from_files==False:
-      RedisTable.import_from_flies(self,name="direct_import")
+        self.saveable = RedisTable._Saveable(self, name=name, full_name=name)
+
+    if self.config[
+        "using_model_lib"] and self.already_import_from_files == False:
+      RedisTable.import_from_flies(self, name="direct_import")
       self.already_import_from_files = True
 
   def _create_resource(self):
@@ -172,18 +150,17 @@ class RedisTable(LookupInterface):
         value_dtype=self._value_dtype,
         value_shape=self._default_value.get_shape(),
         embedding_name=self._embedding_name,
-        connection_mode=self._redis_params["connection_mode"],
-        master_name=self._redis_params["master_name"],
-        host_ip=self._redis_params["host_ip"],
-        host_port=self._redis_params["host_port"],
-        password=self._redis_params["password"],
-        db=self._redis_params["db"],
-        storage_slice=self._redis_params["storage_slice"],
-        using_MD5_prefix_name=self._redis_params["using_MD5_prefix_name"],
-        model_tag=self._redis_params["model_tag"],
-        using_model_lib=self._redis_params["using_model_lib"],
-        model_lib_abs_dir=self._redis_params["model_lib_abs_dir"]
-    )
+        connection_mode=self.config.connection_mode,
+        master_name=self.config.master_name,
+        host_ip=self.config.host_ip,
+        host_port=self.config.host_port,
+        password=self.config.password,
+        db=self.config.db,
+        storage_slice=self.config.storage_slice,
+        using_MD5_prefix_name=self.config.using_MD5_prefix_name,
+        model_tag=self.config.model_tag,
+        using_model_lib=self.config.using_model_lib,
+        model_lib_abs_dir=self.config.model_lib_abs_dir)
 
     if context.executing_eagerly():
       self._table_name = None
@@ -198,33 +175,32 @@ class RedisTable(LookupInterface):
   def size(self, name=None):
     """Compute the number of elements in this table.
 
-        Args:
-          name: A name for the operation (optional).
+      Args:
+        name: A name for the operation (optional).
 
-        Returns:
-          A scalar tensor containing the number of elements in this table.
-        """
+      Returns:
+        A scalar tensor containing the number of elements in this table.
+    """
     with ops.name_scope(name, "%s_Size" % self.name, [self.resource_handle]):
       with ops.colocate_with(self.resource_handle):
-        return redis_table_ops.tfra_redis_table_size(
-            self.resource_handle)
+        return redis_table_ops.tfra_redis_table_size(self.resource_handle)
 
   def remove(self, keys, name=None):
     """Removes `keys` and its associated values from the table.
 
-        If a key is not present in the table, it is silently ignored.
+      If a key is not present in the table, it is silently ignored.
 
-        Args:
-          keys: Keys to remove. Can be a tensor of any shape. Must match the table's
-            key type.
-          name: A name for the operation (optional).
+      Args:
+        keys: Keys to remove. Can be a tensor of any shape. Must match the table's
+          key type.
+        name: A name for the operation (optional).
 
-        Returns:
-          The created Operation.
+      Returns:
+        The created Operation.
 
-        Raises:
-          TypeError: when `keys` do not match the table data types.
-        """
+      Raises:
+        TypeError: when `keys` do not match the table data types.
+    """
     if keys.dtype != self._key_dtype:
       raise TypeError("Signature mismatch. Keys must be dtype %s, got %s." %
                       (self._key_dtype, keys.dtype))
@@ -234,8 +210,7 @@ class RedisTable(LookupInterface):
         "%s_lookup_table_remove" % self.name,
         (self.resource_handle, keys, self._default_value),
     ):
-      op = redis_table_ops.tfra_redis_table_remove(
-          self.resource_handle, keys)
+      op = redis_table_ops.tfra_redis_table_remove(self.resource_handle, keys)
 
     return op
 
@@ -300,8 +275,8 @@ class RedisTable(LookupInterface):
       values = ops.convert_to_tensor(values, self._value_dtype, name="values")
       with ops.colocate_with(self.resource_handle):
         # pylint: disable=protected-access
-        op = redis_table_ops.tfra_redis_table_insert(
-            self.resource_handle, keys, values)
+        op = redis_table_ops.tfra_redis_table_insert(self.resource_handle, keys,
+                                                     values)
     return op
 
   def import_from_flies(self, name=None):
@@ -311,21 +286,21 @@ class RedisTable(LookupInterface):
           name: A name for the operation (optional).
 
         """
-    
+
     with ops.name_scope(name, "%s_lookup_table_export_values" % self.name,
                         [self.resource_handle]):
       with ops.colocate_with(self.resource_handle):
         ndims = self._default_value.get_shape().ndims
-        if ndims==1:
-          useless_keys = ops.convert_to_tensor(0,dtype=self.key_dtype)
+        if ndims == 1:
+          useless_keys = ops.convert_to_tensor(0, dtype=self.key_dtype)
         else:
-          useless_keys = tf.zeros(shape=(self._default_value.get_shape()[0]),dtype=self.key_dtype)
-        useless_vals = tf.zeros(shape=self._default_value.get_shape(),dtype=self.value_dtype)
-        return redis_table_ops.tfra_redis_table_import(
-            self.resource_handle,
-            useless_keys,
-            useless_vals
-        )
+          useless_keys = tf.zeros(shape=(self._default_value.get_shape()[0]),
+                                  dtype=self.key_dtype)
+        useless_vals = tf.zeros(shape=self._default_value.get_shape(),
+                                dtype=self.value_dtype)
+        return redis_table_ops.tfra_redis_table_import(self.resource_handle,
+                                                       useless_keys,
+                                                       useless_vals)
 
   def export(self, name=None):
     """Returns nothing in Redis Implement. It will dump some binary files
@@ -344,8 +319,9 @@ class RedisTable(LookupInterface):
         (
             exported_keys,
             exported_values,
-        ) = redis_table_ops.tfra_redis_table_export(
-            self.resource_handle, self._key_dtype, self._value_dtype)
+        ) = redis_table_ops.tfra_redis_table_export(self.resource_handle,
+                                                    self._key_dtype,
+                                                    self._value_dtype)
     return exported_keys, exported_values
 
   def _gather_saveables_for_checkpoint(self):

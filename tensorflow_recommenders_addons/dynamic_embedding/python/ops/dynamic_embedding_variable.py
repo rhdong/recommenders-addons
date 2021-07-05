@@ -149,8 +149,9 @@ class Variable(trackable.TrackableResource):
       initializer=None,
       trainable=True,
       checkpoint=True,
-      params_dict={},
+      init_size=0,
       restrict_policy=None,
+      kv_creator=de.CuckooHashTableCreator(),
   ):
     """Creates an empty `Variable` object.
 
@@ -229,7 +230,7 @@ class Variable(trackable.TrackableResource):
 
     self._tables = []
     self.size_ops = []
-    self.params_dict = params_dict
+    self.kv_creator = kv_creator
 
     self.shard_num = len(self.devices)
     self.init_size = int(init_size)
@@ -264,18 +265,16 @@ class Variable(trackable.TrackableResource):
       with ops.colocate_with(None, ignore_existing=True):
         for idx in range(len(self.devices)):
           with ops.device(self.devices[idx]):
-            mht = None
-            KVcreator = de.KVcreator()
-            mht = KVcreator.create(
-                key_dtype=self.key_dtype,
-                value_dtype=self.value_dtype,
-                default_value=static_default_value,
-                name=self._make_name(idx),
-                checkpoint=self.checkpoint,
-                init_size=int(self.init_size / self.shard_num),
-            )
+            _table = None
+            _table = kv_creator.create(key_dtype=self.key_dtype,
+                                       value_dtype=self.value_dtype,
+                                       default_value=static_default_value,
+                                       name=self._make_name(idx),
+                                       checkpoint=self.checkpoint,
+                                       init_size=int(self.init_size /
+                                                     self.shard_num))
 
-            self._tables.append(mht)
+            self._tables.append(_table)
     super(Variable, self).__init__()
 
     ops.add_to_collection(de.GraphKeys.DYNAMIC_EMBEDDING_VARIABLES, self)
@@ -524,8 +523,9 @@ def get_variable(
     initializer=None,
     trainable=True,
     checkpoint=True,
-    params_dict={},
+    init_size=0,
     restrict_policy=None,
+    kv_creator=de.CuckooHashTableCreator(),
 ):
   """Gets an `Variable` object with this name if it exists,
          or create a new one.
@@ -589,8 +589,9 @@ def get_variable(
         initializer=initializer,
         trainable=trainable,
         checkpoint=checkpoint,
-        params_dict=params_dict,
+        init_size=init_size,
         restrict_policy=restrict_policy,
+        kv_creator=kv_creator,
     )
     scope_store._vars[full_name] = var_
   return scope_store._vars[full_name]
