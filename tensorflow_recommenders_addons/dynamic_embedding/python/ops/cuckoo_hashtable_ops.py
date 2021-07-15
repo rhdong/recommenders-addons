@@ -21,7 +21,9 @@ from __future__ import print_function
 import functools
 
 from tensorflow.python.eager import context
+from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
+from tensorflow.python.ops import array_ops
 from tensorflow.python.ops.lookup_ops import LookupInterface
 from tensorflow.python.training.saver import BaseSaverBuilder
 
@@ -72,7 +74,7 @@ class CuckooHashTable(LookupInterface):
           checkpoint: if True, the contents of the table are saved to and restored
             from checkpoints. If `shared_name` is empty for a checkpointed table, it
             is shared using the table node name.
-          init_size: initial size for the Variable and initial size of each hash 
+          init_size: initial size for the Variable and initial size of each hash
             tables will be int(init_size / N), N is the number of the devices.
 
         Returns:
@@ -203,26 +205,36 @@ class CuckooHashTable(LookupInterface):
 
     return op
 
-  def lookup(self, keys, dynamic_default_values=None, name=None):
+  def lookup(self,
+             keys,
+             dynamic_default_values=None,
+             return_exists=False,
+             name=None):
     """Looks up `keys` in a table, outputs the corresponding values.
 
-        The `default_value` is used for keys not present in the table.
+      The `default_value` is used for keys not present in the table.
 
-        Args:
-          keys: Keys to look up. Can be a tensor of any shape. Must match the
-            table's key_dtype.
-          dynamic_default_values: The values to use if a key is missing in the
-            table. If None (by default), the static default_value
-            `self._default_value` will be used.
-          name: A name for the operation (optional).
+      Args:
+        keys: Keys to look up. Can be a tensor of any shape. Must match the
+          table's key_dtype.
+        dynamic_default_values: The values to use if a key is missing in the
+          table. If None (by default), the static default_value
+          `self._default_value` will be used.
+        return_exists: if True, will return a additional Tenor which indicates
+          if keys are existing in the table.
+        name: A name for the operation (optional).
 
-        Returns:
-          A tensor containing the values in the same shape as `keys` using the
-            table's value type.
+      Returns:
+        A tensor containing the values in the same shape as `keys` using the
+          table's value type.
+        exists:
+          A bool type Tensor of the same shape as `keys` which indicates
+            if keys are existing in the table.
+            Only provided if `return_exists` is True.
 
-        Raises:
-          TypeError: when `keys` do not match the table data types.
-        """
+      Raises:
+        TypeError: when `keys` do not match the table data types.
+    """
     with ops.name_scope(
         name,
         "%s_lookup_table_find" % self.name,
@@ -230,13 +242,21 @@ class CuckooHashTable(LookupInterface):
     ):
       keys = ops.convert_to_tensor(keys, dtype=self._key_dtype, name="keys")
       with ops.colocate_with(self.resource_handle):
-        values = cuckoo_hashtable_ops.tfra_cuckoo_hash_table_find(
-            self.resource_handle,
-            keys,
-            dynamic_default_values
-            if dynamic_default_values is not None else self._default_value,
-        )
-    return values
+        if return_exists:
+          values, exists = cuckoo_hashtable_ops.tfra_cuckoo_hash_table_find_with_exists(
+              self.resource_handle,
+              keys,
+              dynamic_default_values
+              if dynamic_default_values is not None else self._default_value,
+          )
+        else:
+          values = cuckoo_hashtable_ops.tfra_cuckoo_hash_table_find(
+              self.resource_handle,
+              keys,
+              dynamic_default_values
+              if dynamic_default_values is not None else self._default_value,
+          )
+    return (values, exists) if return_exists else values
 
   def insert(self, keys, values, name=None):
     """Associates `keys` with `values`.
@@ -266,6 +286,41 @@ class CuckooHashTable(LookupInterface):
         # pylint: disable=protected-access
         op = cuckoo_hashtable_ops.tfra_cuckoo_hash_table_insert(
             self.resource_handle, keys, values)
+    return op
+
+  def accum(self, keys, values_or_deltas, exists, name=None):
+    """Associates `keys` with `values`.
+
+      Args:
+        keys: Keys to accmulate. Can be a tensor of any shape.
+          Must match the table's key type.
+        values_or_deltas: values to be associated with keys. Must be a tensor of
+          the same shape as `keys` and match the table's value type.
+        exists: A bool type tensor indicates keys were exist or not.
+          Must be a tensor of the same shape as `keys`.
+        name: A name for the operation (optional).
+
+      Returns:
+        The created Operation.
+
+      Raises:
+        TypeError: when `keys` or `values` doesn't match the table data
+          types.
+    """
+    with ops.name_scope(
+        name,
+        "%s_lookup_table_accum" % self.name,
+        [self.resource_handle, keys, values_or_deltas],
+    ):
+      keys = ops.convert_to_tensor(keys, self._key_dtype, name="keys")
+      values_or_deltas = ops.convert_to_tensor(values_or_deltas,
+                                               self._value_dtype,
+                                               name="values_or_deltas")
+      exists = ops.convert_to_tensor(exists, dtypes.bool, name="exists")
+      with ops.colocate_with(self.resource_handle):
+        # pylint: disable=protected-access
+        op = cuckoo_hashtable_ops.tfra_cuckoo_hash_table_accum(
+            self.resource_handle, keys, values_or_deltas, exists)
     return op
 
   def export(self, name=None):

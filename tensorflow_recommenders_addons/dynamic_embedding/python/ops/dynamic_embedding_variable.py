@@ -344,6 +344,52 @@ class Variable(trackable.TrackableResource):
 
     return control_flow_ops.group(ops_)
 
+  def accum(self, keys, old_values, new_values, exists, name=None):
+    """Insert or Update `keys` with `values`.
+
+      If key exists already, value will be updated.
+
+      Args:
+        keys: Keys to insert. Can be a tensor of any shape. Must match the table's
+          key type.
+        values: Values to be associated with keys. Must be a tensor of the same
+          shape as `keys` and match the table's value type.
+        name: A name for the operation (optional).
+
+      Returns:
+        The created Operation.
+
+      Raises:
+        TypeError: when `keys` or `values` doesn't match the table data
+          types.
+    """
+    exists = ops.convert_to_tensor(exists, dtypes.bool, name="original_exists")
+    exists = array_ops.reshape(exists, shape=[-1, 1])
+    exists_expanded = array_ops.repeat(exists, axis=-1, repeats=self.dim)
+    exists_expanded = array_ops.reshape(exists_expanded,
+                                        shape=array_ops.shape(old_values))
+    values_or_deltas = array_ops.where(exists_expanded,
+                                       new_values - old_values,
+                                       new_values,
+                                       name="values_or_deltas")
+    partition_index = self.partition_fn(keys, self.shard_num)
+    keys_partitions, _ = make_partition(keys, partition_index, self.shard_num)
+    values_or_deltas_partitions, _ = make_partition(values_or_deltas,
+                                                    partition_index,
+                                                    self.shard_num)
+    exists_partitions, _ = make_partition(exists, partition_index,
+                                          self.shard_num)
+
+    ops_ = []
+    for idx in range(len(self.devices)):
+      with ops.device(self.devices[idx]):
+        ops_.append(self._tables[idx].accum(keys_partitions[idx],
+                                            values_or_deltas_partitions[idx],
+                                            exists_partitions[idx],
+                                            name=name))
+
+    return control_flow_ops.group(ops_)
+
   def restrict(self, num_reserved, **kwargs):
     """
     Restrict the size of self, also including features reside in commensal
@@ -419,25 +465,32 @@ class Variable(trackable.TrackableResource):
           format(str(self.name), str(e)))
     return init_op
 
-  def lookup(self, keys, name=None):
+  def lookup(self, keys, return_exists=False, name=None):
     """Looks up `keys` in a Variable, outputs the corresponding values.
 
-        The `default_value` is used for keys not present in the table.
+      The `default_value` is used for keys not present in the table.
 
-        Args:
-          keys: Keys to look up. Can be a tensor of any shape. Must match the
-            table's key_dtype.
-          name: A name for the operation (optional).
+      Args:
+        keys: Keys to look up. Can be a tensor of any shape. Must match the
+          table's key_dtype.
+        return_exists: if True, will return a additional Tenor which indicates
+          if keys are existing in the table.
+        name: A name for the operation (optional).
 
-        Returns:
-          A tensor containing the values in the same shape as `keys` using the
-            table's value type.
-        """
+      Returns:
+        A tensor containing the values in the same shape as `keys` using the
+          table's value type.
+        exists:
+          A bool type Tensor of the same shape as `keys` which indicates
+            if keys are existing in the table.
+            Only provided if `return_exists` is True.
+    """
     partition_index = self.partition_fn(keys, self.shard_num)
     keys_partitions, keys_indices = make_partition(keys, partition_index,
                                                    self.shard_num)
 
-    ops_ = []
+    values_ = []
+    exists_ = []
     for idx in range(len(self.devices)):
       with ops.device(self.devices[idx]):
         dynamic_default_values = self._create_default_values_by_initializer(
@@ -445,13 +498,24 @@ class Variable(trackable.TrackableResource):
         if dynamic_default_values is not None:
           dynamic_default_values = math_ops.cast(dynamic_default_values,
                                                  self.value_dtype)
-        ops_.append(self._tables[idx].lookup(
+
+        ops_ = None
+        ops_ = self._tables[idx].lookup(
             keys_partitions[idx],
             dynamic_default_values=dynamic_default_values,
+            return_exists=return_exists,
             name=name,
-        ))
-    result = _stitch(ops_, keys_indices)
+        )
+        if return_exists:
+          values_.append(ops_[0])
+          exists_.append(ops_[1])
+        else:
+          values_.append(ops_)
 
+    if return_exists:
+      result = (_stitch(values_, keys_indices), _stitch(exists_, keys_indices))
+    else:
+      result = _stitch(values_, keys_indices)
     return result
 
   def export(self, name=None):
