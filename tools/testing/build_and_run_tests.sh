@@ -24,14 +24,8 @@ python -m pip install -r tools/install_deps/pytest.txt -e ./
 TF_NEED_CUDA=$TF_NEED_CUDA python ./configure.py
 bash tools/install_so_files.sh
 
-# use 10 workers if a gpu is available, otherwise,
-# one worker per cpu core. Kokoro has 38 cores, that'd be too much
-# for the gpu memory, until we change the device placement to
-# use multiple gpus when they are available.
+
 EXTRA_ARGS="-n 10"
-if ! [ -x "$(command -v nvidia-smi)" ]; then
-  EXTRA_ARGS="-n auto"
-fi
 
 
 python -m pytest -v -s --functions-durations=20 --modules-durations=5 $EXTRA_ARGS ./tensorflow_recommenders_addons
