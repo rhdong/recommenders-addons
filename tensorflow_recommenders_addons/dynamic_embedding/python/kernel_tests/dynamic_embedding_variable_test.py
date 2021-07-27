@@ -461,6 +461,7 @@ class VariableTest(test.TestCase):
                          simulate_other_process_add_vals))
         self.evaluate(table.remove(simulate_other_process_remove_keys))
         self.assertAllEqual(4, self.evaluate(table.size()))
+        print(self.evaluate(table.export()))
         self.evaluate(
             table.accum(accum_keys, old_values, new_values, exported_exists))
 

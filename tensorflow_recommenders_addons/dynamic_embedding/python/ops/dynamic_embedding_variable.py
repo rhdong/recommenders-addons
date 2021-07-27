@@ -349,14 +349,17 @@ class Variable(trackable.TrackableResource):
 
   def accum(self, keys, old_values, new_values, exists, name=None):
     """
-    Insert `keys` with `values` or accumlate a delta value
+    Insert `keys` with `values` if not exist, or Accumlate a delta value
       `new_values - old_values` to 'keys'.
+    This API will help relieve stale gradient problem in asynchronous training.
 
     Args:
       keys: Keys to insert. Can be a tensor of any shape. Must match
         the table's key type.
-      values: Values to be associated with keys. Must be a tensor of the same
-        shape as `keys` and match the table's value type.
+      old_values: old values to be associated with keys. Must be a tensor of the
+        same shape as `keys` and match the table's value type.
+      new_values: new values to be associated with keys. Must be a tensor of the
+        same shape as `keys` and match the table's value type.
       exists: A bool type tensor indicates keys were exist or not.
         Must be a tensor of the same shape as `keys`.
       name: A name for the operation (optional).
