@@ -37,6 +37,7 @@ from tensorflow.python.ops import variables
 from tensorflow.python.ops import variable_scope
 from tensorflow.python.training import optimizer
 from tensorflow.python.training import slot_creator
+from tensorflow.python.training.tracking import base as trackable
 
 
 def DynamicEmbeddingOptimizer(self, bp_v2=None):
@@ -154,7 +155,7 @@ def DynamicEmbeddingOptimizer(self, bp_v2=None):
 
       return self._iterations.assign_add(1)
 
-  def add_slot(var, slot_name, initializer="zeros"):
+  def add_slot(var, slot_name, initializer="zeros", shape=None):
     """Add a new slot variable for `var`."""
     if slot_name not in self._slot_names:
       self._slot_names.append(slot_name)
@@ -162,33 +163,45 @@ def DynamicEmbeddingOptimizer(self, bp_v2=None):
     slot_dict = self._slots.setdefault(var_key, {})
     weight = slot_dict.get(slot_name, None)
     if weight is None:
-      if isinstance(initializer, six.string_types) or callable(initializer):
+      if isinstance(initializer, str) or callable(initializer):
         initializer = initializers.get(initializer)
-        initial_value = functools.partial(initializer,
-                                          shape=var.shape,
-                                          dtype=var.dtype)
+        if isinstance(
+            initializer,
+            trackable.CheckpointInitialValueCallable) or (shape is not None):
+          slot_shape = shape
+        else:
+          slot_shape = var.shape
+        initial_value = functools.partial(
+            initializer, shape=slot_shape, dtype=var.dtype)
       else:
         initial_value = initializer
-      strategy = distribute_ctx.get_strategy()
-      with strategy.extended.colocate_vars_with(var):
-        if isinstance(var, de.TrainableWrapper):
-          weight = de.create_slots(var, initial_value, slot_name,
-                                   var._shared_name, self._bp_v2)
-        else:
-          weight = variables.Variable(
-              name="%s/%s" % (
-                  var._shared_name,
-                  slot_name,
-              ),  # pylint: disable=protected-access
-              dtype=var.dtype,
-              trainable=False,
-              initial_value=initial_value,
-          )
+
+      with self._distribution_strategy_scope():
+        strategy = distribute_ctx.get_strategy()
+        if not strategy.extended.variable_created_in_scope(var):
+          raise ValueError(
+              "Trying to create optimizer slot variable under the scope for "
+              "tf.distribute.Strategy ({}), which is different from the scope "
+              "used for the original variable ({}). Make sure the slot "
+              "variables are created under the same strategy scope. This may "
+              "happen if you're restoring from a checkpoint outside the scope"
+              .format(strategy, var))
+
+        with strategy.extended.colocate_vars_with(var):
+          if isinstance(var, de.TrainableWrapper):
+            weight = de.create_slots(var, initial_value, slot_name,
+                                     var._shared_name, self._bp_v2)
+          else:
+            weight = variables.Variable(
+                name="%s/%s" % (var._shared_name, slot_name),  # pylint: disable=protected-access
+                dtype=var.dtype,
+                trainable=False,
+                initial_value=initial_value)
       backend.track_variable(weight)
       slot_dict[slot_name] = weight
-      self._restore_slot_variable(slot_name=slot_name,
-                                  variable=var,
-                                  slot_variable=weight)
+      self._restore_slot_variable(
+          slot_name=slot_name, variable=var,
+          slot_variable=weight)
       self._weights.append(weight)
     return weight
 
