@@ -34,3 +34,5 @@ if ! [ -x "$(command -v nvidia-smi)" ]; then
 fi
 
 python -m pytest -v -s --functions-durations=20 --modules-durations=5 $EXTRA_ARGS ./tensorflow_recommenders_addons
+
+python -m horovodrun -np 2 pytest -v ./tensorflow_recommenders_addons/dynamic_embedding/python/kernel_tests/horovod_sync_train_test.py
