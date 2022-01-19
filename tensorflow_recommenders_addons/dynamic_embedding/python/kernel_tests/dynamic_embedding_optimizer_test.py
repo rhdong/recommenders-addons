@@ -54,6 +54,7 @@ from tensorflow.python.training import proximal_adagrad
 from tensorflow.python.training import proximal_gradient_descent as pgd
 from tensorflow.python.training import rmsprop
 from tensorflow.python.training import training_util
+from tensorflow_addons import optimizers as tfa_optimizer
 
 
 # pylint: disable=missing-class-docstring
@@ -344,6 +345,28 @@ class CommonTrainableTestV2Base(object):
     self.common_minimize_trainable_v2(base_opt, test_opt, name="rmsprop")
 
 
+class CommonTrainableTestTfaBase(object):
+
+  def common_minimize_trainable_tfa(self, base_opt, test_opt, name):
+    raise NotImplementedError
+
+  def device_check(self, de):
+    if test_util.is_gpu_available():
+      self.assertTrue("GPU" in de.tables[0].resource_handle.device.upper())
+
+  @test_util.run_in_graph_and_eager_modes
+  def test_lazyadam_minimize_trainable(self):
+    base_opt = tfa_optimizer.lazy_adam.LazyAdam(learning_rate=1.0)
+    test_opt = tfa_optimizer.lazy_adam.LazyAdam(learning_rate=1.0)
+    self.common_minimize_trainable_tfa(base_opt, test_opt, name="lazyadam")
+
+  @test_util.run_in_graph_and_eager_modes
+  def test_adamw_minimize_trainable(self):
+    base_opt = tfa_optimizer.AdamW(weight_decay=0.9, learning_rate=1.0)
+    test_opt = tfa_optimizer.AdamW(weight_decay=0.9, learning_rate=1.0)
+    self.common_minimize_trainable_tfa(base_opt, test_opt, name="adamw")
+
+
 class EmbeddingLookupTrainableV1Test(test.TestCase, CommonTrainableTestV1Base):
 
   def common_minimize_trainable(self, base_opt, test_opt, name, bp_v2):
@@ -501,6 +524,110 @@ class EmbeddingLookupTrainableV2Test(test.TestCase, CommonTrainableTestV2Base):
         with ops.Graph().as_default(), self.cached_session():
           embeddings = de.get_variable(
               "t2020-v2-" + name + str(id),
+              key_dtype=k_dtype,
+              value_dtype=d_dtype,
+              devices=_get_devices() * num_shards,
+              initializer=1.0,
+              dim=dim,
+          )
+          self.device_check(embeddings)
+          trainables = []
+          init_ids = constant_op.constant(raw_init_ids, dtype=k_dtype)
+          init_vals = constant_op.constant(raw_init_vals, dtype=d_dtype)
+          self.evaluate(embeddings.upsert(init_ids, init_vals))
+
+          def var_fn():
+            return trainables
+
+          def loss_fn(x, trainables):
+            ids = constant_op.constant(raw_ids, dtype=k_dtype)
+            pred, trainable = de.embedding_lookup([x],
+                                                  ids,
+                                                  return_trainable=True,
+                                                  name='xg5785')
+            trainables.clear()
+            trainables.append(trainable)
+            return pred * pred
+
+          test_opt_op = test_opt.minimize(
+              lambda: loss_fn(embeddings, trainables), var_fn)
+          self.evaluate(variables.global_variables_initializer())
+          for _ in range(run_step):
+            self.evaluate(test_opt_op)
+          return self.evaluate(embeddings.lookup(init_ids))
+
+      with ops.device(_get_devices()[0]):
+        test_opt_val = test_fn()
+      self.assertAllCloseAccordingToType(
+          base_opt_val,
+          test_opt_val,
+          msg="Cond:{},{},{},{},{},{}".format(num_shards, k_dtype, d_dtype,
+                                              initial_mode, dim, run_step),
+      )
+
+
+class EmbeddingLookupTrainableTfaTest(test.TestCase,
+                                      CommonTrainableTestTfaBase):
+
+  def common_minimize_trainable_tfa(self, base_opt, test_opt, name):
+    de.enable_train_mode()
+    tf.config.set_soft_device_placement(True)
+    base_opt = de.DynamicEmbeddingOptimizer(base_opt)
+    test_opt = de.DynamicEmbeddingOptimizer(test_opt)
+    id = 0
+    for (
+        num_shards,
+        k_dtype,
+        d_dtype,
+        initial_mode,
+        dim,
+        run_step,
+    ) in itertools.product(
+        [1, 2],
+        [
+            dtypes.int64,
+        ],
+        [
+            dtypes.float32,
+        ],
+        [
+            "constant",
+        ],
+        [1, 10],
+        [10],
+    ):
+      id += 1
+      # common define
+      raw_init_ids = [0, 1]
+      raw_init_vals = np.random.rand(2, dim)
+      raw_ids = [
+          0,
+      ]
+
+      # base graph
+      def base_fn():
+        with ops.Graph().as_default(), self.cached_session():
+          embeddings = resource_variable_ops.ResourceVariable(raw_init_vals,
+                                                              dtype=d_dtype)
+
+          def loss_fn(emb):
+            ids = constant_op.constant(raw_ids, dtype=k_dtype)
+            pred = embedding_ops.embedding_lookup([emb], ids, name='ct9143')
+            return pred * pred
+
+          base_opt_op = base_opt.minimize(lambda: loss_fn(embeddings),
+                                          [embeddings])
+          self.evaluate(variables.global_variables_initializer())
+          for _ in range(run_step):
+            self.evaluate(base_opt_op)
+          return self.evaluate(embeddings)
+
+      base_opt_val = base_fn()
+
+      def test_fn():
+        with ops.Graph().as_default(), self.cached_session():
+          embeddings = de.get_variable(
+              "t2022-v2-" + name + str(id),
               key_dtype=k_dtype,
               value_dtype=d_dtype,
               devices=_get_devices() * num_shards,
