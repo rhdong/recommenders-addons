@@ -18,7 +18,8 @@ custom_op_library(
         "utils/types.h",
     ] + glob(["kernels/lookup_impl/lookup_table_op_cpu*"]),
     cuda_deps = if_cuda_for_tf_serving(
-        ["//tensorflow_recommenders_addons/dynamic_embedding/core/lib/nvhash:nvhashtable"],
+        ["//tensorflow_recommenders_addons/dynamic_embedding/core/lib/nvhash:nvhashtable",
+         "//tensorflow_recommenders_addons/dynamic_embedding/core/lib/merlin-hkvs:merlinkv"],
         [],
         FOR_TF_SERVING,
     ),
@@ -26,9 +27,10 @@ custom_op_library(
         "kernels/cuckoo_hashtable_op.h",
         "kernels/cuckoo_hashtable_op_gpu.h",
         "kernels/cuckoo_hashtable_op_gpu.cu.cc",
+        "kernels/lookup_impl/lookup_table_op_gpu.h",
         "utils/utils.h",
         "utils/types.h",
-    ] + glob(["kernels/lookup_impl/lookup_table_op_gpu*"])),
+    ] + glob(["kernels/lookup_impl/lookup_table_op_gpu_impl_float_*"])),
     deps = ["//tensorflow_recommenders_addons/dynamic_embedding/core/lib/cuckoo:cuckoohash"],
 )
 
@@ -82,7 +84,8 @@ custom_op_library(
         "utils/utils.h",
     ],
     cuda_deps = if_cuda_for_tf_serving(
-        ["//tensorflow_recommenders_addons/dynamic_embedding/core/lib/nvhash:nvhashtable"],
+        ["//tensorflow_recommenders_addons/dynamic_embedding/core/lib/nvhash:nvhashtable",
+         "//tensorflow_recommenders_addons/dynamic_embedding/core/lib/merlin-hkvs:merlinkv"],
         [],
         FOR_TF_SERVING,
     ),

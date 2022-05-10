@@ -661,10 +661,10 @@ REGISTER_KERNEL_BUILDER(
       HashTableFindWithExistsGpuOp<key_dtype, value_dtype>)
 
 REGISTER_KERNEL(int64, float);
-REGISTER_KERNEL(int64, Eigen::half);
-REGISTER_KERNEL(int64, int64);
-REGISTER_KERNEL(int64, int32);
-REGISTER_KERNEL(int64, int8);
+//REGISTER_KERNEL(int64, Eigen::half);
+//REGISTER_KERNEL(int64, int64);
+//REGISTER_KERNEL(int64, int32);
+//REGISTER_KERNEL(int64, int8);
 
 #undef REGISTER_KERNEL
 
