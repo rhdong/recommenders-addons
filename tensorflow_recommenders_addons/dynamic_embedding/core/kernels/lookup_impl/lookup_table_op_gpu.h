@@ -29,7 +29,7 @@ limitations under the License.
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/thread_annotations.h"
-#include "tensorflow_recommenders_addons/dynamic_embedding/core/lib/nvhash/nv_hashtable.cuh"
+#include "tensorflow_recommenders_addons/dynamic_embedding/core/lib/merlin-hkvs/cpp/include/merlin_hashtable.cuh"
 
 namespace tensorflow {
 namespace recommenders_addons {
@@ -49,12 +49,14 @@ struct ValueArray : public ValueArrayBase<V> {
 template <class T>
 using ValueType = ValueArrayBase<T>;
 
-template <class K, class V>
+template <class K, class V, class M = uint64_t>
 class TableWrapperBase {
  public:
   virtual ~TableWrapperBase() {}
   virtual void upsert(const K* d_keys, const ValueType<V>* d_vals, size_t len,
                       cudaStream_t stream) {}
+  virtual void upsert(const K* d_keys, const ValueType<V>* d_vals,
+                      const M* d_metas, size_t len, cudaStream_t stream) {}
   virtual void accum(const K* d_keys, const ValueType<V>* d_vals_or_deltas,
                      const bool* d_exists, size_t len, cudaStream_t stream) {}
   virtual void dump(K* d_key, ValueType<V>* d_val, const size_t offset,
@@ -69,11 +71,10 @@ class TableWrapperBase {
   virtual void clear(cudaStream_t stream) {}
 };
 
-template <class K, class V, size_t DIM>
+template <class K, class V, size_t DIM, class M = uint64_t>
 class TableWrapper final : public TableWrapperBase<K, V> {
  private:
-  using Table = nv::HashTable<K, ValueArray<V, DIM>, ValueType<V>,
-                              std::numeric_limits<K>::max(), DIM>;
+  using Table = nv::merlin::HashTable<K, ValueArray<V, DIM>, ValueType<V>, M, DIM>;
 
  public:
   TableWrapper(size_t max_size) : max_size_(max_size) {
@@ -85,6 +86,11 @@ class TableWrapper final : public TableWrapperBase<K, V> {
   void upsert(const K* d_keys, const ValueType<V>* d_vals, size_t len,
               cudaStream_t stream) override {
     table_->upsert(d_keys, d_vals, len, stream);
+  }
+
+  void upsert(const K* d_keys, const ValueType<V>* d_vals, const M* d_metas,
+              size_t len, cudaStream_t stream) override {
+    table_->upsert(d_keys, d_vals, d_metas, len, stream);
   }
 
   void accum(const K* d_keys, const ValueType<V>* d_vals_or_deltas,
@@ -175,10 +181,10 @@ void CreateTableImpl(TableWrapperBase<K, V>** pptable, size_t max_size,
                     TableWrapperBase<K, V>**);
 
 DECLARE_CREATE_TABLE(int64, float);
-DECLARE_CREATE_TABLE(int64, Eigen::half);
-DECLARE_CREATE_TABLE(int64, int64);
-DECLARE_CREATE_TABLE(int64, int32);
-DECLARE_CREATE_TABLE(int64, int8);
+// DECLARE_CREATE_TABLE(int64, Eigen::half);
+// DECLARE_CREATE_TABLE(int64, int64);
+// DECLARE_CREATE_TABLE(int64, int32);
+// DECLARE_CREATE_TABLE(int64, int8);
 
 #undef CREATE_A_TABLE
 #undef CREATE_DEFAULT_TABLE
