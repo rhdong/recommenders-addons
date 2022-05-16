@@ -43,7 +43,7 @@ namespace lookup {
 using tensorflow::OpKernelContext;
 using tensorflow::lookup::LookupInterface;
 
-template <class K, class V>
+template <class K, class V, class M = uint64_t>
 class CuckooHashTableOfTensorsGpu final : public LookupInterface {
  public:
   CuckooHashTableOfTensorsGpu(OpKernelContext* ctx, OpKernel* kernel) {
@@ -146,6 +146,42 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
     return Status::OK();
   }
 
+  Status FindWithMetas(OpKernelContext* ctx, const Tensor& d_keys,
+                       Tensor* value, Tensor* metas,
+                       const Tensor& default_value) {
+    size_t len = d_keys.flat<K>().size();
+    bool* d_status;
+    gpu::ValueArrayBase<V>* d_default_value;
+
+    auto value_flat = value->flat_inner_dims<V, 2>();
+    const auto default_flat = default_value.flat<V>();
+    int64 total = value_flat.size();
+    int64 default_total = default_flat.size();
+    bool is_full_default = (total == default_total);
+
+    cudaStream_t _stream;
+
+    if (len > 0) {
+      size_t default_value_num =
+          is_full_default ? default_value.shape().dim_size(0) : 1;
+      CUDA_CHECK(cudaStreamCreate(&_stream));
+      CUDA_CHECK(cudaMallocManaged((void**)&d_status, sizeof(bool) * len));
+      {
+        tf_shared_lock l(mu_);
+        table_->get((const K*)d_keys.tensor_data().data(),
+                    (gpu::ValueArrayBase<V>*)value->tensor_data().data(),
+                    (M*)metas->tensor_data().data(), d_status, len,
+                    (gpu::ValueArrayBase<V>*)default_value.tensor_data().data(),
+                    _stream, is_full_default);
+        CUDA_CHECK(cudaStreamSynchronize(_stream));
+      }
+      CUDA_CHECK(cudaFree(d_status));
+      CUDA_CHECK(cudaFree(d_default_value));
+      CUDA_CHECK(cudaStreamDestroy(_stream));
+    }
+    return Status::OK();
+  }
+
   Status FindWithExists(OpKernelContext* ctx, const Tensor& d_keys,
                         Tensor* value, const Tensor& default_value,
                         Tensor* exists) {
@@ -180,6 +216,8 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
   }
 
   void RehashIfNeeded(cudaStream_t stream) {
+    return;
+    /*
     K* d_keys;
     gpu::ValueArrayBase<V>* d_values;
     size_t* d_dump_counter;
@@ -222,6 +260,7 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
                 << ", load factor=" << std::setprecision(2)
                 << (float)total_size / (float)max_size_ << "].";
     }
+    */
   }
 
   Status Insert(OpKernelContext* ctx, const Tensor& keys,
@@ -235,6 +274,24 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
       table_->upsert((const K*)keys.tensor_data().data(),
                      (const gpu::ValueArrayBase<V>*)values.tensor_data().data(),
                      len, _stream);
+      CUDA_CHECK(cudaStreamSynchronize(_stream));
+    };
+    CUDA_CHECK(cudaStreamDestroy(_stream));
+
+    return Status::OK();
+  }
+
+  Status InsertWithMetas(OpKernelContext* ctx, const Tensor& keys,
+                         const Tensor& values, const Tensor& metas) {
+    size_t len = keys.flat<K>().size();
+    cudaStream_t _stream;
+    CUDA_CHECK(cudaStreamCreate(&_stream));
+    {
+      mutex_lock l(mu_);
+      RehashIfNeeded(_stream);
+      table_->upsert((const K*)keys.tensor_data().data(),
+                     (const gpu::ValueArrayBase<V>*)values.tensor_data().data(),
+                     (const M*)metas.tensor_data().data(), len, _stream);
       CUDA_CHECK(cudaStreamSynchronize(_stream));
     };
     CUDA_CHECK(cudaStreamDestroy(_stream));
@@ -379,7 +436,7 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
   size_t min_size_;
   size_t runtime_dim_;
   mutable mutex mu_;
-  gpu::TableWrapperBase<K, V>* table_ = nullptr GUARDED_BY(mu_);
+  gpu::TableWrapperBase<K, V, M>* table_ = nullptr GUARDED_BY(mu_);
 };
 
 }  // namespace lookup
@@ -421,8 +478,51 @@ REGISTER_KERNEL_BUILDER(
     Name(PREFIX_OP_NAME(CuckooHashTableFind)).Device(DEVICE_GPU),
     HashTableFindGpuOp);
 
-// Table lookup op. Perform the lookup operation on the given table.
+// Table lookup op with return metas.
+template <class K, class V>
+class HashTableFindWithMetasGpuOp : public OpKernel {
+ public:
+  explicit HashTableFindWithMetasGpuOp(OpKernelConstruction* ctx)
+      : OpKernel(ctx) {}
 
+  void Compute(OpKernelContext* ctx) override {
+    lookup::LookupInterface* table;
+    OP_REQUIRES_OK(ctx, GetLookupTable("table_handle", ctx, &table));
+    core::ScopedUnref unref_me(table);
+
+    lookup::CuckooHashTableOfTensorsGpu<K, V>* table_cuckoo =
+        (lookup::CuckooHashTableOfTensorsGpu<K, V>*)table;
+
+    // Input 0 could be a STRING_REF or a RESOURCE
+    DataType expected_input_0 = DT_RESOURCE;
+    DataTypeVector expected_inputs = {expected_input_0, table->key_dtype(),
+                                      table->value_dtype()};
+    DataTypeVector expected_outputs = {table->value_dtype()};
+    OP_REQUIRES_OK(ctx, ctx->MatchSignature(expected_inputs, expected_outputs));
+
+    const Tensor& keys = ctx->input(1);
+    const Tensor& default_values = ctx->input(2);
+
+    TensorShape values_shape = keys.shape();
+    TensorShape metas_shape = keys.shape();
+
+    values_shape.RemoveLastDims(table->key_shape().dims());
+    values_shape.AppendShape(table->value_shape());
+    Tensor* values;
+    Tensor* metas;
+    AllocatorAttributes attr;
+    attr.set_gpu_compatible(true);
+    OP_REQUIRES_OK(ctx,
+                   ctx->allocate_output("values", values_shape, &values, attr));
+    OP_REQUIRES_OK(ctx,
+                   ctx->allocate_output("metas", metas_shape, &metas, attr));
+
+    OP_REQUIRES_OK(ctx, table_cuckoo->FindWithMetas(ctx, keys, values, metas,
+                                                    default_values));
+  }
+};
+
+// Table lookup op. Perform the lookup operation on the given table.
 template <class K, class V>
 class HashTableFindWithExistsGpuOp : public OpKernel {
  public:
@@ -489,6 +589,36 @@ class HashTableInsertGpuOp : public OpKernel {
 REGISTER_KERNEL_BUILDER(
     Name(PREFIX_OP_NAME(CuckooHashTableInsert)).Device(DEVICE_GPU),
     HashTableInsertGpuOp);
+
+// Table insert with metas op.
+template <class K, class V>
+class HashTableInsertWithMetasGpuOp : public OpKernel {
+ public:
+  explicit HashTableInsertWithMetasGpuOp(OpKernelConstruction* ctx)
+      : OpKernel(ctx) {}
+
+  void Compute(OpKernelContext* ctx) override {
+    lookup::LookupInterface* table;
+    OP_REQUIRES_OK(ctx, GetLookupTable("table_handle", ctx, &table));
+    core::ScopedUnref unref_me(table);
+
+    lookup::CuckooHashTableOfTensorsGpu<K, V>* table_cuckoo =
+        (lookup::CuckooHashTableOfTensorsGpu<K, V>*)table;
+
+    DataType expected_input_0 = DT_RESOURCE;
+    DataTypeVector expected_inputs = {expected_input_0, table->key_dtype(),
+                                      table->value_dtype()};
+    OP_REQUIRES_OK(ctx, ctx->MatchSignature(expected_inputs, {}));
+
+    const Tensor& keys = ctx->input(1);
+    const Tensor& values = ctx->input(2);
+    const Tensor& metas = ctx->input(3);
+    OP_REQUIRES_OK(
+        ctx, table_cuckoo->CheckKeyAndValueTensorsForInsert(keys, values));
+    OP_REQUIRES_OK(ctx,
+                   table_cuckoo->InsertWithMetas(ctx, keys, values, metas));
+  }
+};
 
 // Table accum op.
 template <class K, class V>
@@ -634,37 +764,48 @@ REGISTER_KERNEL_BUILDER(
 
 // Register the CuckooHashTableOfTensors op.
 
-#define REGISTER_KERNEL(key_dtype, value_dtype)                            \
-  REGISTER_KERNEL_BUILDER(                                                 \
-      Name(PREFIX_OP_NAME(CuckooHashTableOfTensors))                       \
-          .Device(DEVICE_GPU)                                              \
-          .TypeConstraint<key_dtype>("key_dtype")                          \
-          .TypeConstraint<value_dtype>("value_dtype"),                     \
-      HashTableGpuOp<                                                      \
-          lookup::CuckooHashTableOfTensorsGpu<key_dtype, value_dtype>,     \
-          key_dtype, value_dtype>);                                        \
-  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(CuckooHashTableClear))       \
-                              .Device(DEVICE_GPU)                          \
-                              .TypeConstraint<key_dtype>("key_dtype")      \
-                              .TypeConstraint<value_dtype>("value_dtype"), \
-                          HashTableClearGpuOp<key_dtype, value_dtype>)     \
-  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(CuckooHashTableAccum))       \
-                              .Device(DEVICE_GPU)                          \
-                              .TypeConstraint<key_dtype>("key_dtype")      \
-                              .TypeConstraint<value_dtype>("value_dtype"), \
-                          HashTableAccumGpuOp<key_dtype, value_dtype>)     \
-  REGISTER_KERNEL_BUILDER(                                                 \
-      Name(PREFIX_OP_NAME(CuckooHashTableFindWithExists))                  \
-          .Device(DEVICE_GPU)                                              \
-          .TypeConstraint<key_dtype>("Tin")                                \
-          .TypeConstraint<value_dtype>("Tout"),                            \
-      HashTableFindWithExistsGpuOp<key_dtype, value_dtype>)
+#define REGISTER_KERNEL(key_dtype, value_dtype)                                \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name(PREFIX_OP_NAME(CuckooHashTableOfTensors))                           \
+          .Device(DEVICE_GPU)                                                  \
+          .TypeConstraint<key_dtype>("key_dtype")                              \
+          .TypeConstraint<value_dtype>("value_dtype"),                         \
+      HashTableGpuOp<                                                          \
+          lookup::CuckooHashTableOfTensorsGpu<key_dtype, value_dtype>,         \
+          key_dtype, value_dtype>);                                            \
+  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(CuckooHashTableClear))           \
+                              .Device(DEVICE_GPU)                              \
+                              .TypeConstraint<key_dtype>("key_dtype")          \
+                              .TypeConstraint<value_dtype>("value_dtype"),     \
+                          HashTableClearGpuOp<key_dtype, value_dtype>)         \
+  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(CuckooHashTableAccum))           \
+                              .Device(DEVICE_GPU)                              \
+                              .TypeConstraint<key_dtype>("key_dtype")          \
+                              .TypeConstraint<value_dtype>("value_dtype"),     \
+                          HashTableAccumGpuOp<key_dtype, value_dtype>)         \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name(PREFIX_OP_NAME(CuckooHashTableFindWithExists))                      \
+          .Device(DEVICE_GPU)                                                  \
+          .TypeConstraint<key_dtype>("Tin")                                    \
+          .TypeConstraint<value_dtype>("Tout"),                                \
+      HashTableFindWithExistsGpuOp<key_dtype, value_dtype>)                    \
+  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(CuckooHashTableFindWithMetas))   \
+                              .Device(DEVICE_GPU)                              \
+                              .TypeConstraint<key_dtype>("Tin")                \
+                              .TypeConstraint<value_dtype>("Tout"),            \
+                          HashTableFindWithMetasGpuOp<key_dtype, value_dtype>) \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name(PREFIX_OP_NAME(CuckooHashTableInsertWithMetas))                     \
+          .Device(DEVICE_GPU)                                                  \
+          .TypeConstraint<key_dtype>("Tin")                                    \
+          .TypeConstraint<value_dtype>("Tout"),                                \
+      HashTableInsertWithMetasGpuOp<key_dtype, value_dtype>)
 
 REGISTER_KERNEL(int64, float);
-//REGISTER_KERNEL(int64, Eigen::half);
-//REGISTER_KERNEL(int64, int64);
-//REGISTER_KERNEL(int64, int32);
-//REGISTER_KERNEL(int64, int8);
+REGISTER_KERNEL(int64, Eigen::half);
+REGISTER_KERNEL(int64, int64);
+REGISTER_KERNEL(int64, int32);
+REGISTER_KERNEL(int64, int8);
 
 #undef REGISTER_KERNEL
 

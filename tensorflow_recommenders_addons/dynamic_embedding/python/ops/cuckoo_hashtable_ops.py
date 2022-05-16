@@ -89,6 +89,7 @@ class CuckooHashTable(LookupInterface):
     self._checkpoint = checkpoint
     self._key_dtype = key_dtype
     self._value_dtype = value_dtype
+    self._meta_dtype = dtypes.int64
     self._init_size = init_size
     self._name = name
 
@@ -207,6 +208,7 @@ class CuckooHashTable(LookupInterface):
              keys,
              dynamic_default_values=None,
              return_exists=False,
+             return_metas=False,
              name=None):
     """Looks up `keys` in a table, outputs the corresponding values.
 
@@ -220,6 +222,8 @@ class CuckooHashTable(LookupInterface):
           `self._default_value` will be used.
         return_exists: if True, will return a additional Tensor which indicates
           if or not keys are existing in the table.
+        return_metas: if True, will return a additional Tensor which indicates
+          if metas in the table.
         name: A name for the operation (optional).
 
       Returns:
@@ -233,6 +237,10 @@ class CuckooHashTable(LookupInterface):
       Raises:
         TypeError: when `keys` do not match the table data types.
     """
+    if return_exists and return_metas:
+      raise ValueError("Not support return exists and metas at the same time.")
+
+    returns = None
     with ops.name_scope(
         name,
         "%s_lookup_table_find" % self.name,
@@ -247,6 +255,15 @@ class CuckooHashTable(LookupInterface):
               dynamic_default_values
               if dynamic_default_values is not None else self._default_value,
           )
+          returns = (values, exists)
+        elif return_metas:
+          values, metas = cuckoo_ops.tfra_cuckoo_hash_table_find_with_metas(
+              self.resource_handle,
+              keys,
+              dynamic_default_values
+              if dynamic_default_values is not None else self._default_value,
+          )
+          returns = (values, metas)
         else:
           values = cuckoo_ops.tfra_cuckoo_hash_table_find(
               self.resource_handle,
@@ -254,9 +271,11 @@ class CuckooHashTable(LookupInterface):
               dynamic_default_values
               if dynamic_default_values is not None else self._default_value,
           )
-    return (values, exists) if return_exists else values
+          returns = values
 
-  def insert(self, keys, values, name=None):
+    return returns
+
+  def insert(self, keys, values, metas=None, name=None):
     """Associates `keys` with `values`.
 
         Args:
@@ -264,6 +283,8 @@ class CuckooHashTable(LookupInterface):
             key type.
           values: Values to be associated with keys. Must be a tensor of the same
             shape as `keys` and match the table's value type.
+          metas: Metas to be associated with keys. Must be a tensor of the same
+            shape as `keys` and match the table's meta type.
           name: A name for the operation (optional).
 
         Returns:
@@ -280,10 +301,16 @@ class CuckooHashTable(LookupInterface):
     ):
       keys = ops.convert_to_tensor(keys, self._key_dtype, name="keys")
       values = ops.convert_to_tensor(values, self._value_dtype, name="values")
+      if metas is not None:
+        metas = ops.convert_to_tensor(metas, self._meta_dtype, name="metas")
       with ops.colocate_with(self.resource_handle, ignore_existing=True):
         # pylint: disable=protected-access
-        op = cuckoo_ops.tfra_cuckoo_hash_table_insert(self.resource_handle,
-                                                      keys, values)
+        if metas is None:
+          op = cuckoo_ops.tfra_cuckoo_hash_table_insert(self.resource_handle,
+                                                        keys, values)
+        else:
+          op = cuckoo_ops.tfra_cuckoo_hash_table_insert_with_metas(
+              self.resource_handle, keys, values, metas)
     return op
 
   def accum(self, keys, values_or_deltas, exists, name=None):

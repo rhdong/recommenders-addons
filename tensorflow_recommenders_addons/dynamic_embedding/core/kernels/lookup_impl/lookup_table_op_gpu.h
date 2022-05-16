@@ -65,6 +65,10 @@ class TableWrapperBase {
   virtual void get(const K* d_keys, ValueType<V>* d_vals, bool* d_status,
                    size_t len, ValueType<V>* d_def_val, cudaStream_t stream,
                    bool is_full_size_default) const {}
+
+  virtual void get(const K* d_keys, ValueType<V>* d_vals, M* d_metas,
+                   bool* d_status, size_t len, ValueType<V>* d_def_val,
+                   cudaStream_t stream, bool is_full_size_default) const {}
   virtual size_t get_size(cudaStream_t stream) const {}
   virtual size_t get_capacity() const {}
   virtual void remove(const K* d_keys, size_t len, cudaStream_t stream) {}
@@ -72,9 +76,10 @@ class TableWrapperBase {
 };
 
 template <class K, class V, size_t DIM, class M = uint64_t>
-class TableWrapper final : public TableWrapperBase<K, V> {
+class TableWrapper final : public TableWrapperBase<K, V, M> {
  private:
-  using Table = nv::merlin::HashTable<K, ValueArray<V, DIM>, ValueType<V>, M, DIM>;
+  using Table =
+      nv::merlin::HashTable<K, ValueArray<V, DIM>, ValueType<V>, M, DIM>;
 
  public:
   TableWrapper(size_t max_size) : max_size_(max_size) {
@@ -108,6 +113,13 @@ class TableWrapper final : public TableWrapperBase<K, V> {
            ValueType<V>* d_def_val, cudaStream_t stream,
            bool is_full_size_default) const override {
     table_->get(d_keys, d_vals, d_status, len, d_def_val, stream,
+                is_full_size_default);
+  }
+
+  void get(const K* d_keys, ValueType<V>* d_vals, M* d_metas, bool* d_status,
+           size_t len, ValueType<V>* d_def_val, cudaStream_t stream,
+           bool is_full_size_default) const override {
+    table_->get(d_keys, d_vals, d_metas, d_status, len, d_def_val, stream,
                 is_full_size_default);
   }
 
@@ -181,10 +193,10 @@ void CreateTableImpl(TableWrapperBase<K, V>** pptable, size_t max_size,
                     TableWrapperBase<K, V>**);
 
 DECLARE_CREATE_TABLE(int64, float);
-// DECLARE_CREATE_TABLE(int64, Eigen::half);
-// DECLARE_CREATE_TABLE(int64, int64);
-// DECLARE_CREATE_TABLE(int64, int32);
-// DECLARE_CREATE_TABLE(int64, int8);
+DECLARE_CREATE_TABLE(int64, Eigen::half);
+DECLARE_CREATE_TABLE(int64, int64);
+DECLARE_CREATE_TABLE(int64, int32);
+DECLARE_CREATE_TABLE(int64, int8);
 
 #undef CREATE_A_TABLE
 #undef CREATE_DEFAULT_TABLE
