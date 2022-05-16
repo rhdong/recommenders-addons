@@ -27,10 +27,9 @@ custom_op_library(
         "kernels/cuckoo_hashtable_op.h",
         "kernels/cuckoo_hashtable_op_gpu.h",
         "kernels/cuckoo_hashtable_op_gpu.cu.cc",
-        "kernels/lookup_impl/lookup_table_op_gpu.h",
         "utils/utils.h",
         "utils/types.h",
-    ] + glob(["kernels/lookup_impl/lookup_table_op_gpu_impl_float_*"])),
+    ] + glob(["kernels/lookup_impl/lookup_table_op_gpu*"])),
     deps = ["//tensorflow_recommenders_addons/dynamic_embedding/core/lib/cuckoo:cuckoohash"],
 )
 
