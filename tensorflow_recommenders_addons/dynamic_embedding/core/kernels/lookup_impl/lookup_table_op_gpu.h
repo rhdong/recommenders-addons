@@ -79,7 +79,7 @@ template <class K, class V, size_t DIM, class M = uint64_t>
 class TableWrapper final : public TableWrapperBase<K, V, M> {
  private:
   using Table =
-      nv::merlin::HashTable<K, ValueArray<V, DIM>, ValueType<V>, M, DIM>;
+      nv::merlin::HashTable<K, ValueArray<V, DIM>, ValueType<V>, V, M, DIM>;
 
  public:
   TableWrapper(size_t max_size) : max_size_(max_size) {
