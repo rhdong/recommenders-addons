@@ -195,8 +195,6 @@ class CommonTrainableTestV1Base(object):
 
   @test_util.deprecated_graph_mode_only
   def test_adadelta_minimize_trainable_bpv2(self):
-    # TODO(jamesrong): remove after supporting accum.
-    self.skipTest('skip accum test when using Merlin-HKVS.')
     base_opt = adadelta.AdadeltaOptimizer(1.0)
     test_opt = adadelta.AdadeltaOptimizer(1.0)
     self.common_minimize_trainable(base_opt,
@@ -206,8 +204,6 @@ class CommonTrainableTestV1Base(object):
 
   @test_util.deprecated_graph_mode_only
   def test_adagrad_minimize_trainable_bpv2(self):
-    # TODO(jamesrong): remove after supporting accum.
-    self.skipTest('skip accum test when using Merlin-HKVS.')
     base_opt = adagrad.AdagradOptimizer(1.0)
     test_opt = adagrad.AdagradOptimizer(1.0)
     self.common_minimize_trainable(base_opt,
@@ -217,8 +213,6 @@ class CommonTrainableTestV1Base(object):
 
   @test_util.deprecated_graph_mode_only
   def test_adagradda_minimize_trainable_bpv2(self):
-    # TODO(jamesrong): remove after supporting accum.
-    self.skipTest('skip accum test when using Merlin-HKVS.')
     base_gs = training_util.create_global_step()
 
     base_opt = adagrad_da.AdagradDAOptimizer(1.0, base_gs)
@@ -230,16 +224,12 @@ class CommonTrainableTestV1Base(object):
 
   @test_util.deprecated_graph_mode_only
   def test_ftrl_minimize_trainable_bpv2(self):
-    # TODO(jamesrong): remove after supporting accum.
-    self.skipTest('skip accum test when using Merlin-HKVS.')
     base_opt = ftrl.FtrlOptimizer(1.0)
     test_opt = ftrl.FtrlOptimizer(1.0)
     self.common_minimize_trainable(base_opt, test_opt, name="ftrl", bp_v2=True)
 
   @test_util.deprecated_graph_mode_only
   def test_proximal_adagrad_minimize_trainable_bpv2(self):
-    # TODO(jamesrong): remove after supporting accum.
-    self.skipTest('skip accum test when using Merlin-HKVS.')
     base_opt = proximal_adagrad.ProximalAdagradOptimizer(1.0)
     test_opt = proximal_adagrad.ProximalAdagradOptimizer(1.0)
     self.common_minimize_trainable(base_opt,
@@ -249,8 +239,6 @@ class CommonTrainableTestV1Base(object):
 
   @test_util.deprecated_graph_mode_only
   def test_proximalsgd_minimize_trainable_bpv2(self):
-    # TODO(jamesrong): remove after supporting accum.
-    self.skipTest('skip accum test when using Merlin-HKVS.')
     base_opt = pgd.ProximalGradientDescentOptimizer(1.0)
     test_opt = pgd.ProximalGradientDescentOptimizer(1.0)
     self.common_minimize_trainable(base_opt,
@@ -260,8 +248,6 @@ class CommonTrainableTestV1Base(object):
 
   @test_util.deprecated_graph_mode_only
   def test_momentum_minimize_trainable_bpv2(self):
-    # TODO(jamesrong): remove after supporting accum.
-    self.skipTest('skip accum test when using Merlin-HKVS.')
     base_opt = momentum.MomentumOptimizer(1.0, momentum=0.9)
     test_opt = momentum.MomentumOptimizer(1.0, momentum=0.9)
     self.common_minimize_trainable(base_opt,
@@ -271,24 +257,18 @@ class CommonTrainableTestV1Base(object):
 
   @test_util.deprecated_graph_mode_only
   def test_sgd_minimize_trainable_bpv2(self):
-    # TODO(jamesrong): remove after supporting accum.
-    self.skipTest('skip accum test when using Merlin-HKVS.')
     base_opt = gradient_descent.GradientDescentOptimizer(1.0)
     test_opt = gradient_descent.GradientDescentOptimizer(1.0)
     self.common_minimize_trainable(base_opt, test_opt, name="sgd", bp_v2=True)
 
   @test_util.deprecated_graph_mode_only
   def test_adam_minimize_trainable_bpv2(self):
-    # TODO(jamesrong): remove after supporting accum.
-    self.skipTest('skip accum test when using Merlin-HKVS.')
     base_opt = adam.AdamOptimizer(1.0)
     test_opt = adam.AdamOptimizer(1.0)
     self.common_minimize_trainable(base_opt, test_opt, name="adam", bp_v2=True)
 
   @test_util.deprecated_graph_mode_only
   def test_rmsprop_minimize_trainable_bpv2(self):
-    # TODO(jamesrong): remove after supporting accum.
-    self.skipTest('skip accum test when using Merlin-HKVS.')
     for centered_ in [False, True]:
       base_opt = rmsprop.RMSPropOptimizer(1.0, centered=centered_)
       test_opt = rmsprop.RMSPropOptimizer(1.0, centered=centered_)

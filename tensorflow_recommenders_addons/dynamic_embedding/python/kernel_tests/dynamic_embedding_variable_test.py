@@ -441,9 +441,6 @@ class VariableTest(test.TestCase):
 
   def test_variable_find_with_exists_and_accum(self):
     id = 0
-    # TODO(jamesrong): remove after supporting accum.
-    self.skipTest('skip accum test when using Merlin-HKVS.')
-
     if test_util.is_gpu_available():
       dim_list = [1, 2, 4, 8, 10, 16, 32, 64, 100, 200]
       kv_list = [[dtypes.int64, dtypes.float32], [dtypes.int64, dtypes.int32],
