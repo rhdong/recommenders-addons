@@ -90,17 +90,17 @@ class TableWrapper final : public TableWrapperBase<K, V, M> {
 
   void upsert(const K* d_keys, const ValueType<V>* d_vals, size_t len,
               cudaStream_t stream) override {
-    table_->upsert(d_keys, d_vals, len, stream);
+    table_->upsert(d_keys, d_vals, len, stream, false);
   }
 
   void upsert(const K* d_keys, const ValueType<V>* d_vals, const M* d_metas,
               size_t len, cudaStream_t stream) override {
-    table_->upsert(d_keys, d_vals, d_metas, len, stream);
+    table_->upsert(d_keys, d_vals, d_metas, len, stream, false);
   }
 
   void accum(const K* d_keys, const ValueType<V>* d_vals_or_deltas,
              const bool* d_exists, size_t len, cudaStream_t stream) override {
-    table_->accum(d_keys, d_vals_or_deltas, d_exists, len, stream);
+    table_->accum(d_keys, d_vals_or_deltas, d_exists, len, stream, false);
   }
 
   void dump(K* d_key, ValueType<V>* d_val, const size_t offset,
