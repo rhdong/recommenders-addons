@@ -63,11 +63,11 @@ class TableWrapperBase {
                     const size_t search_length, size_t* d_dump_counter,
                     cudaStream_t stream) const {}
   virtual void get(const K* d_keys, ValueType<V>* d_vals, bool* d_status,
-                   size_t len, ValueType<V>* d_def_val, cudaStream_t stream,
-                   bool is_full_size_default) const {}
+                   size_t len, const ValueType<V>* d_def_val,
+                   cudaStream_t stream, bool is_full_size_default) const {}
 
   virtual void get(const K* d_keys, ValueType<V>* d_vals, M* d_metas,
-                   bool* d_status, size_t len, ValueType<V>* d_def_val,
+                   bool* d_status, size_t len, const ValueType<V>* d_def_val,
                    cudaStream_t stream, bool is_full_size_default) const {}
   virtual size_t get_size(cudaStream_t stream) const {}
   virtual size_t get_capacity() const {}
@@ -78,8 +78,7 @@ class TableWrapperBase {
 template <class K, class V, size_t DIM, class M = uint64_t>
 class TableWrapper final : public TableWrapperBase<K, V, M> {
  private:
-  using Table =
-      nv::merlin::HashTable<K, ValueArray<V, DIM>, ValueType<V>, V, M, DIM>;
+  using Table = nv::merlin::HashTable<K, V, M, DIM>;
 
  public:
   TableWrapper(size_t max_size) : max_size_(max_size) {
@@ -90,37 +89,39 @@ class TableWrapper final : public TableWrapperBase<K, V, M> {
 
   void upsert(const K* d_keys, const ValueType<V>* d_vals, size_t len,
               cudaStream_t stream) override {
-    table_->upsert(d_keys, d_vals, len, stream, false);
+    table_->upsert(d_keys, (const V*)d_vals, len, stream, false);
   }
 
   void upsert(const K* d_keys, const ValueType<V>* d_vals, const M* d_metas,
               size_t len, cudaStream_t stream) override {
-    table_->upsert(d_keys, d_vals, d_metas, len, stream, false);
+    table_->upsert(d_keys, (const V*)d_vals, d_metas, len, stream, false);
   }
 
   void accum(const K* d_keys, const ValueType<V>* d_vals_or_deltas,
              const bool* d_exists, size_t len, cudaStream_t stream) override {
-    table_->accum(d_keys, d_vals_or_deltas, d_exists, len, stream, false);
+    table_->accum(d_keys, (const V*)d_vals_or_deltas, d_exists, len, stream,
+                  false);
   }
 
   void dump(K* d_key, ValueType<V>* d_val, const size_t offset,
             const size_t search_length, size_t* d_dump_counter,
             cudaStream_t stream) const override {
-    table_->dump(d_key, d_val, offset, search_length, d_dump_counter, stream);
+    table_->dump(d_key, (V*)d_val, offset, search_length, d_dump_counter,
+                 stream);
   }
 
   void get(const K* d_keys, ValueType<V>* d_vals, bool* d_status, size_t len,
-           ValueType<V>* d_def_val, cudaStream_t stream,
+           const ValueType<V>* d_def_val, cudaStream_t stream,
            bool is_full_size_default) const override {
-    table_->get(d_keys, d_vals, d_status, len, d_def_val, stream,
+    table_->get(d_keys, (V*)d_vals, d_status, len, (const V*)d_def_val, stream,
                 is_full_size_default);
   }
 
   void get(const K* d_keys, ValueType<V>* d_vals, M* d_metas, bool* d_status,
-           size_t len, ValueType<V>* d_def_val, cudaStream_t stream,
+           size_t len, const ValueType<V>* d_def_val, cudaStream_t stream,
            bool is_full_size_default) const override {
-    table_->get(d_keys, d_vals, d_metas, d_status, len, d_def_val, stream,
-                is_full_size_default);
+    table_->get(d_keys, (V*)d_vals, d_metas, d_status, len, (const V*)d_def_val,
+                stream, is_full_size_default);
   }
 
   size_t get_size(cudaStream_t stream) const override {
