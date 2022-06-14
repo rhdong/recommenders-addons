@@ -69,8 +69,8 @@ class TableWrapperBase {
   virtual void get(const K* d_keys, ValueType<V>* d_vals, M* d_metas,
                    bool* d_status, size_t len, const ValueType<V>* d_def_val,
                    cudaStream_t stream, bool is_full_size_default) const {}
-  virtual size_t get_size(cudaStream_t stream) const {}
-  virtual size_t get_capacity() const {}
+  virtual size_t get_size(cudaStream_t stream) const { return 0; }
+  virtual size_t get_capacity() const { return 0; }
   virtual void remove(const K* d_keys, size_t len, cudaStream_t stream) {}
   virtual void clear(cudaStream_t stream) {}
 };
