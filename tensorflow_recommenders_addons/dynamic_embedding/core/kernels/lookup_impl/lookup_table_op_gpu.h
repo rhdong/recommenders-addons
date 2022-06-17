@@ -29,7 +29,7 @@ limitations under the License.
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/thread_annotations.h"
-#include "tensorflow_recommenders_addons/dynamic_embedding/core/lib/merlin-hkvs/cpp/include/merlin_hashtable.cuh"
+#include "tensorflow_recommenders_addons/dynamic_embedding/core/lib/merlin-kv/cpp/include/merlin_hashtable.cuh"
 
 namespace tensorflow {
 namespace recommenders_addons {

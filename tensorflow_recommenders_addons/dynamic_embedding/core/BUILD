@@ -19,7 +19,7 @@ custom_op_library(
     ] + glob(["kernels/lookup_impl/lookup_table_op_cpu*"]),
     cuda_deps = if_cuda_for_tf_serving(
         ["//tensorflow_recommenders_addons/dynamic_embedding/core/lib/nvhash:nvhashtable",
-         "//tensorflow_recommenders_addons/dynamic_embedding/core/lib/merlin-hkvs:merlinkv"],
+         "//tensorflow_recommenders_addons/dynamic_embedding/core/lib/merlin-kv:merlinkv"],
         [],
         FOR_TF_SERVING,
     ),
@@ -84,7 +84,7 @@ custom_op_library(
     ],
     cuda_deps = if_cuda_for_tf_serving(
         ["//tensorflow_recommenders_addons/dynamic_embedding/core/lib/nvhash:nvhashtable",
-         "//tensorflow_recommenders_addons/dynamic_embedding/core/lib/merlin-hkvs:merlinkv"],
+         "//tensorflow_recommenders_addons/dynamic_embedding/core/lib/merlin-kv:merlinkv"],
         [],
         FOR_TF_SERVING,
     ),
