@@ -377,7 +377,12 @@ class Variable(base.Trackable):
     return "{}_mht_{}of{}".format(self.name.replace("/", "_"), table_idx + 1,
                                   self.shard_num)
 
-  def upsert(self, keys, values, name=None):
+  def upsert(self,
+             keys,
+             values,
+             metas=None,
+             allow_duplicated_keys=True,
+             name=None):
     """Insert or Update `keys` with `values`.
 
         If key exists already, value will be updated.
@@ -387,6 +392,11 @@ class Variable(base.Trackable):
             key type.
           values: Values to be associated with keys.Must be a tensor of
             arrays with same shape as `keys` and match the table's value type.
+          metas: Metas to be associated with keys. Must be a tensor of the same
+            shape as `keys` and match the table's meta type.
+          allow_duplicated_keys: If true, allow the `keys` contains the duplcated key.
+            If false, users guarantee the `keys` is unique. If false, the performance
+            will be better.
           name: A name for the operation (optional).
 
         Returns:
@@ -401,13 +411,20 @@ class Variable(base.Trackable):
     keys_partitions, _ = make_partition(keys, partition_index, self.shard_num)
     values_partitions, _ = make_partition(values, partition_index,
                                           self.shard_num)
+    metas_partitions = None
+    if metas is not None:
+      metas_partitions, _ = make_partition(metas, partition_index,
+                                           self.shard_num)
 
     ops_ = []
     for idx in range(len(self.devices)):
       with ops.device(self.devices[idx]):
-        ops_.append(self._tables[idx].insert(keys_partitions[idx],
-                                             values_partitions[idx],
-                                             name=name))
+        ops_.append(self._tables[idx].insert(
+            keys_partitions[idx],
+            values_partitions[idx],
+            metas_partitions[idx] if metas is not None else None,
+            allow_duplicated_keys,
+            name=name))
 
     return control_flow_ops.group(ops_)
 
@@ -572,18 +589,18 @@ class Variable(base.Trackable):
     for idx in range(len(self.devices)):
       with ops.device(self.devices[idx]):
         dynamic_default_values = self._create_default_values_by_initializer(
-          keys_partitions[idx])
+            keys_partitions[idx])
         if dynamic_default_values is not None:
           dynamic_default_values = math_ops.cast(dynamic_default_values,
                                                  self.value_dtype)
 
         ops_ = None
         ops_ = self._tables[idx].lookup(
-          keys_partitions[idx],
-          dynamic_default_values=dynamic_default_values,
-          return_exists=return_exists,
-          return_metas=return_metas,
-          name=name,
+            keys_partitions[idx],
+            dynamic_default_values=dynamic_default_values,
+            return_exists=return_exists,
+            return_metas=return_metas,
+            name=name,
         )
         if return_exists:
           _values.append(ops_[0])

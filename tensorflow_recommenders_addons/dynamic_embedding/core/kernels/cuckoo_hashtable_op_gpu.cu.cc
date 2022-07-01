@@ -152,6 +152,7 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
 
     auto value_flat = value->flat_inner_dims<V, 2>();
     const auto default_flat = default_value.flat<V>();
+    auto d_metas = metas->tensor_data().data();
     int64 total = value_flat.size();
     int64 default_total = default_flat.size();
     bool is_full_default = (total == default_total);
@@ -163,6 +164,7 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
           is_full_default ? default_value.shape().dim_size(0) : 1;
       CUDA_CHECK(cudaStreamCreate(&_stream));
       CUDA_CHECK(cudaMallocManaged((void**)&d_status, sizeof(bool) * len));
+      CUDA_CHECK(cudaMemset((void*)d_metas, 0, sizeof(M) * len));
       {
         tf_shared_lock l(mu_);
         table_->get((const K*)d_keys.tensor_data().data(),
@@ -257,6 +259,24 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
     */
   }
 
+  Status Insert(OpKernelContext* ctx, const Tensor& keys, const Tensor& values,
+                bool allow_duplicated_keys) {
+    size_t len = keys.flat<K>().size();
+    cudaStream_t _stream;
+    CUDA_CHECK(cudaStreamCreate(&_stream));
+    {
+      mutex_lock l(mu_);
+      RehashIfNeeded(_stream);
+      table_->upsert((const K*)keys.tensor_data().data(),
+                     (const gpu::ValueArrayBase<V>*)values.tensor_data().data(),
+                     len, allow_duplicated_keys, _stream);
+      CUDA_CHECK(cudaStreamSynchronize(_stream));
+    };
+    CUDA_CHECK(cudaStreamDestroy(_stream));
+
+    return Status::OK();
+  }
+
   Status Insert(OpKernelContext* ctx, const Tensor& keys,
                 const Tensor& values) override {
     size_t len = keys.flat<K>().size();
@@ -267,7 +287,7 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
       RehashIfNeeded(_stream);
       table_->upsert((const K*)keys.tensor_data().data(),
                      (const gpu::ValueArrayBase<V>*)values.tensor_data().data(),
-                     len, _stream);
+                     len, true, _stream);
       CUDA_CHECK(cudaStreamSynchronize(_stream));
     };
     CUDA_CHECK(cudaStreamDestroy(_stream));
@@ -276,7 +296,8 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
   }
 
   Status InsertWithMetas(OpKernelContext* ctx, const Tensor& keys,
-                         const Tensor& values, const Tensor& metas) {
+                         const Tensor& values, const Tensor& metas,
+                         bool allow_duplicated_keys) {
     size_t len = keys.flat<K>().size();
     cudaStream_t _stream;
     CUDA_CHECK(cudaStreamCreate(&_stream));
@@ -285,7 +306,8 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
       RehashIfNeeded(_stream);
       table_->upsert((const K*)keys.tensor_data().data(),
                      (const gpu::ValueArrayBase<V>*)values.tensor_data().data(),
-                     (const M*)metas.tensor_data().data(), len, _stream);
+                     (const M*)metas.tensor_data().data(), len,
+                     allow_duplicated_keys, _stream);
       CUDA_CHECK(cudaStreamSynchronize(_stream));
     };
     CUDA_CHECK(cudaStreamDestroy(_stream));
@@ -352,6 +374,8 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
     size_t len = keys.flat<K>().size();
     K* d_keys;
     gpu::ValueArrayBase<V>* d_values;
+    bool allow_duplicated_keys = true;
+
     if (len > 0) {
       cudaStream_t _stream;
       CUDA_CHECK(cudaStreamCreate(&_stream));
@@ -366,7 +390,8 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
         mutex_lock l(mu_);
         table_->clear(_stream);
         table_->upsert((const K*)d_keys,
-                       (const gpu::ValueArrayBase<V>*)d_values, len, _stream);
+                       (const gpu::ValueArrayBase<V>*)d_values, len,
+                       allow_duplicated_keys, _stream);
         CUDA_CHECK(cudaStreamSynchronize(_stream));
       }
       CUDA_CHECK(cudaStreamDestroy(_stream));
@@ -435,6 +460,15 @@ class CuckooHashTableOfTensorsGpu final : public LookupInterface {
 
 }  // namespace lookup
 
+Status CheckKeyMetasShape(const Tensor& keys, const Tensor& metas) {
+  if (!(keys.shape() == metas.shape())) {
+    return errors::InvalidArgument("Input key shape ", keys.shape(),
+                                   "and metas shape ", metas.shape(),
+                                   " must the same shape!");
+  }
+  return Status::OK();
+}
+
 // Table lookup op. Perform the lookup operation on the given table.
 class HashTableFindGpuOp : public OpKernel {
  public:
@@ -473,7 +507,7 @@ REGISTER_KERNEL_BUILDER(
     HashTableFindGpuOp);
 
 // Table lookup op with return metas.
-template <class K, class V>
+template <class K, class V, class M = uint64_t>
 class HashTableFindWithMetasGpuOp : public OpKernel {
  public:
   explicit HashTableFindWithMetasGpuOp(OpKernelConstruction* ctx)
@@ -491,7 +525,7 @@ class HashTableFindWithMetasGpuOp : public OpKernel {
     DataType expected_input_0 = DT_RESOURCE;
     DataTypeVector expected_inputs = {expected_input_0, table->key_dtype(),
                                       table->value_dtype()};
-    DataTypeVector expected_outputs = {table->value_dtype()};
+    DataTypeVector expected_outputs = {table->value_dtype(), DT_INT64};
     OP_REQUIRES_OK(ctx, ctx->MatchSignature(expected_inputs, expected_outputs));
 
     const Tensor& keys = ctx->input(1);
@@ -559,37 +593,13 @@ class HashTableFindWithExistsGpuOp : public OpKernel {
 };
 
 // Table insert op.
+template <class K, class V>
 class HashTableInsertGpuOp : public OpKernel {
  public:
-  explicit HashTableInsertGpuOp(OpKernelConstruction* ctx) : OpKernel(ctx) {}
-
-  void Compute(OpKernelContext* ctx) override {
-    lookup::LookupInterface* table;
-    OP_REQUIRES_OK(ctx, GetLookupTable("table_handle", ctx, &table));
-    core::ScopedUnref unref_me(table);
-
-    DataType expected_input_0 = DT_RESOURCE;
-    DataTypeVector expected_inputs = {expected_input_0, table->key_dtype(),
-                                      table->value_dtype()};
-    OP_REQUIRES_OK(ctx, ctx->MatchSignature(expected_inputs, {}));
-
-    const Tensor& keys = ctx->input(1);
-    const Tensor& values = ctx->input(2);
-    OP_REQUIRES_OK(ctx, table->CheckKeyAndValueTensorsForInsert(keys, values));
-    OP_REQUIRES_OK(ctx, table->Insert(ctx, keys, values));
+  explicit HashTableInsertGpuOp(OpKernelConstruction* ctx) : OpKernel(ctx) {
+    OP_REQUIRES_OK(
+        ctx, ctx->GetAttr("allow_duplicated_keys", &allow_duplicated_keys_));
   }
-};
-
-REGISTER_KERNEL_BUILDER(
-    Name(PREFIX_OP_NAME(CuckooHashTableInsert)).Device(DEVICE_GPU),
-    HashTableInsertGpuOp);
-
-// Table insert with metas op.
-template <class K, class V>
-class HashTableInsertWithMetasGpuOp : public OpKernel {
- public:
-  explicit HashTableInsertWithMetasGpuOp(OpKernelConstruction* ctx)
-      : OpKernel(ctx) {}
 
   void Compute(OpKernelContext* ctx) override {
     lookup::LookupInterface* table;
@@ -606,12 +616,50 @@ class HashTableInsertWithMetasGpuOp : public OpKernel {
 
     const Tensor& keys = ctx->input(1);
     const Tensor& values = ctx->input(2);
+    OP_REQUIRES_OK(
+        ctx, table_cuckoo->CheckKeyAndValueTensorsForInsert(keys, values));
+    OP_REQUIRES_OK(ctx, table_cuckoo->Insert(ctx, keys, values));
+  }
+
+ private:
+  bool allow_duplicated_keys_;
+};
+
+// Table insert with metas op.
+template <class K, class V, class M = uint64_t>
+class HashTableInsertWithMetasGpuOp : public OpKernel {
+ public:
+  explicit HashTableInsertWithMetasGpuOp(OpKernelConstruction* ctx)
+      : OpKernel(ctx) {
+    OP_REQUIRES_OK(
+        ctx, ctx->GetAttr("allow_duplicated_keys", &allow_duplicated_keys_));
+  }
+
+  void Compute(OpKernelContext* ctx) override {
+    lookup::LookupInterface* table;
+    OP_REQUIRES_OK(ctx, GetLookupTable("table_handle", ctx, &table));
+    core::ScopedUnref unref_me(table);
+
+    lookup::CuckooHashTableOfTensorsGpu<K, V>* table_cuckoo =
+        (lookup::CuckooHashTableOfTensorsGpu<K, V>*)table;
+
+    DataType expected_input_0 = DT_RESOURCE;
+    DataTypeVector expected_inputs = {expected_input_0, table->key_dtype(),
+                                      table->value_dtype(), DT_INT64};
+    OP_REQUIRES_OK(ctx, ctx->MatchSignature(expected_inputs, {}));
+
+    const Tensor& keys = ctx->input(1);
+    const Tensor& values = ctx->input(2);
     const Tensor& metas = ctx->input(3);
     OP_REQUIRES_OK(
         ctx, table_cuckoo->CheckKeyAndValueTensorsForInsert(keys, values));
-    OP_REQUIRES_OK(ctx,
-                   table_cuckoo->InsertWithMetas(ctx, keys, values, metas));
+    OP_REQUIRES_OK(ctx, CheckKeyMetasShape(keys, metas));
+    OP_REQUIRES_OK(ctx, table_cuckoo->InsertWithMetas(ctx, keys, values, metas,
+                                                      allow_duplicated_keys_));
   }
+
+ private:
+  bool allow_duplicated_keys_;
 };
 
 // Table accum op.
@@ -793,7 +841,12 @@ REGISTER_KERNEL_BUILDER(
           .Device(DEVICE_GPU)                                                  \
           .TypeConstraint<key_dtype>("Tin")                                    \
           .TypeConstraint<value_dtype>("Tout"),                                \
-      HashTableInsertWithMetasGpuOp<key_dtype, value_dtype>)
+      HashTableInsertWithMetasGpuOp<key_dtype, value_dtype>)                   \
+  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(CuckooHashTableInsert))          \
+                              .Device(DEVICE_GPU)                              \
+                              .TypeConstraint<key_dtype>("Tin")                \
+                              .TypeConstraint<value_dtype>("Tout"),            \
+                          HashTableInsertGpuOp<key_dtype, value_dtype>)
 
 REGISTER_KERNEL(int64, float);
 REGISTER_KERNEL(int64, Eigen::half);

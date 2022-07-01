@@ -275,7 +275,12 @@ class CuckooHashTable(LookupInterface):
 
     return returns
 
-  def insert(self, keys, values, metas=None, name=None):
+  def insert(self,
+             keys,
+             values,
+             metas=None,
+             allow_duplicated_keys=True,
+             name=None):
     """Associates `keys` with `values`.
 
         Args:
@@ -285,6 +290,9 @@ class CuckooHashTable(LookupInterface):
             shape as `keys` and match the table's value type.
           metas: Metas to be associated with keys. Must be a tensor of the same
             shape as `keys` and match the table's meta type.
+          allow_duplicated_keys: If true, allow the `keys` contains the duplcated key.
+            If false, users guarantee the `keys` is unique. If false, the performance
+            will be better.
           name: A name for the operation (optional).
 
         Returns:
@@ -307,10 +315,11 @@ class CuckooHashTable(LookupInterface):
         # pylint: disable=protected-access
         if metas is None:
           op = cuckoo_ops.tfra_cuckoo_hash_table_insert(self.resource_handle,
-                                                        keys, values)
+                                                        keys, values,
+                                                        allow_duplicated_keys)
         else:
           op = cuckoo_ops.tfra_cuckoo_hash_table_insert_with_metas(
-              self.resource_handle, keys, values, metas)
+              self.resource_handle, keys, values, metas, allow_duplicated_keys)
     return op
 
   def accum(self, keys, values_or_deltas, exists, name=None):

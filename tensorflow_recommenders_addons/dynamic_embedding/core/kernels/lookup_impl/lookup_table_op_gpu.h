@@ -54,9 +54,10 @@ class TableWrapperBase {
  public:
   virtual ~TableWrapperBase() {}
   virtual void upsert(const K* d_keys, const ValueType<V>* d_vals, size_t len,
-                      cudaStream_t stream) {}
+                      bool allow_duplicated_keys, cudaStream_t stream) {}
   virtual void upsert(const K* d_keys, const ValueType<V>* d_vals,
-                      const M* d_metas, size_t len, cudaStream_t stream) {}
+                      const M* d_metas, size_t len, bool allow_duplicated_keys,
+                      cudaStream_t stream) {}
   virtual void accum(const K* d_keys, const ValueType<V>* d_vals_or_deltas,
                      const bool* d_exists, size_t len, cudaStream_t stream) {}
   virtual void dump(K* d_key, ValueType<V>* d_val, const size_t offset,
@@ -88,13 +89,16 @@ class TableWrapper final : public TableWrapperBase<K, V, M> {
   ~TableWrapper() override { delete table_; }
 
   void upsert(const K* d_keys, const ValueType<V>* d_vals, size_t len,
-              cudaStream_t stream) override {
-    table_->upsert(d_keys, (const V*)d_vals, len, stream, false);
+              bool allow_duplicated_keys, cudaStream_t stream) override {
+    table_->upsert(d_keys, (const V*)d_vals, len, stream,
+                   allow_duplicated_keys);
   }
 
   void upsert(const K* d_keys, const ValueType<V>* d_vals, const M* d_metas,
-              size_t len, cudaStream_t stream) override {
-    table_->upsert(d_keys, (const V*)d_vals, d_metas, len, stream, false);
+              size_t len, bool allow_duplicated_keys,
+              cudaStream_t stream) override {
+    table_->upsert(d_keys, (const V*)d_vals, d_metas, len, stream,
+                   allow_duplicated_keys);
   }
 
   void accum(const K* d_keys, const ValueType<V>* d_vals_or_deltas,

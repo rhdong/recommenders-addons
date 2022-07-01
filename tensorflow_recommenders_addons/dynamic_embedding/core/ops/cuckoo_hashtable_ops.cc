@@ -210,6 +210,7 @@ REGISTER_OP(PREFIX_OP_NAME(CuckooHashTableInsert))
     .Input("values: Tout")
     .Attr("Tin: type")
     .Attr("Tout: type")
+    .Attr("allow_duplicated_keys: bool = true")
     .SetShapeFn([](InferenceContext* c) {
       ShapeHandle handle;
       TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 0, &handle));
@@ -225,6 +226,7 @@ REGISTER_OP(PREFIX_OP_NAME(CuckooHashTableInsertWithMetas))
     .Input("metas: int64")
     .Attr("Tin: type")
     .Attr("Tout: type")
+    .Attr("allow_duplicated_keys: bool = true")
     .SetShapeFn([](InferenceContext* c) {
       ShapeHandle handle;
       TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 0, &handle));

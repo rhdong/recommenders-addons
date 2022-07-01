@@ -68,6 +68,7 @@ try:
 except:
   pass
 
+
 # pylint: disable=missing-class-docstring
 # pylint: disable=missing-function-docstring
 def _type_converter(tf_type):
@@ -85,6 +86,8 @@ def _type_converter(tf_type):
 
 
 g_start = 0
+
+
 def _create_dynamic_shape_continous_tensor(
     start=100000000,
     length=8192,
@@ -101,12 +104,14 @@ def _create_dynamic_shape_continous_tensor(
 
   return _func
 
+
 def _get_devices():
   return ["/gpu:0" if test_util.is_gpu_available() else "/cpu:0"]
 
 
 def _check_device(op, expexted_device="gpu"):
   return expexted_device.upper() in op.device
+
 
 def Murmur3Hash(key):
 
@@ -135,6 +140,7 @@ def Murmur3Hash(key):
   xk = uint64_right_shift(k, 33)
   k = uint64_xor(k, xk)
   return k
+
 
 def embedding_result(params, id_vals, weight_vals=None):
   if weight_vals is None:
@@ -1711,12 +1717,12 @@ class VariableTest(test.TestCase):
         test_values = constant_op.constant(
             [[i * 100.0] * DIM for i in range(key_num_for_test)],
             dtypes.float32)
-        table = mkv.get_variable("y001" + str(allow_duplicated_keys),
-                                 dtypes.int64,
-                                 dtypes.float32,
-                                 dim=DIM,
-                                 init_size=256,
-                                 initializer=default_val)
+        table = de.get_variable("y001" + str(allow_duplicated_keys),
+                                dtypes.int64,
+                                dtypes.float32,
+                                dim=DIM,
+                                init_size=256,
+                                initializer=default_val)
         self.assertAllEqual(0, self.evaluate(table.size()))
 
         self.evaluate(
@@ -1821,11 +1827,11 @@ class VariableTest(test.TestCase):
         test_metas = constant_op.constant(raw_test_metas, dtypes.int64)
 
         table = de.get_variable("y002" + str(allow_duplicated_keys),
-                                 dtypes.int64,
-                                 dtypes.float32,
-                                 dim=DIM,
-                                 init_size=256,
-                                 initializer=default_val)
+                                dtypes.int64,
+                                dtypes.float32,
+                                dim=DIM,
+                                init_size=256,
+                                initializer=default_val)
         self.assertAllEqual(0, self.evaluate(table.size()))
 
         self.evaluate(
@@ -1946,11 +1952,11 @@ class VariableTest(test.TestCase):
                                ] + raw_test_values[3:]
 
         table = de.get_variable("y004" + str(allow_duplicated_keys),
-                                 dtypes.int64,
-                                 dtypes.float32,
-                                 dim=DIM,
-                                 init_size=256,
-                                 initializer=default_val)
+                                dtypes.int64,
+                                dtypes.float32,
+                                dim=DIM,
+                                init_size=256,
+                                initializer=default_val)
         self.assertAllEqual(0, self.evaluate(table.size()))
 
         self.evaluate(
@@ -2030,11 +2036,11 @@ class VariableTest(test.TestCase):
         metas = keys
 
         table = de.get_variable("y006" + str(allow_duplicated_keys),
-                                 dtypes.int64,
-                                 dtypes.float32,
-                                 dim=DIM,
-                                 init_size=capacity,
-                                 initializer=default_val)
+                                dtypes.int64,
+                                dtypes.float32,
+                                dim=DIM,
+                                init_size=capacity,
+                                initializer=default_val)
         self.assertAllEqual(0, self.evaluate(table.size()))
         np.set_printoptions(suppress=True)
 
