@@ -33,6 +33,7 @@ if (is_macos() and is_arm64()):
 else:
   MIN_TF_VERSION = os.getenv("TF_VERSION", "2.6.3")
   MAX_TF_VERSION = os.getenv("TF_VERSION", "2.8.3")
+  MAX_TF_VERSION = os.getenv("TF_VERSION", "2.11.1")
 
 # We follow Semantic Versioning (https://semver.org/)
 _MAJOR_VERSION = "0"
