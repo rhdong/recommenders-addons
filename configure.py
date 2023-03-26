@@ -38,10 +38,10 @@ def _VALID_BAZEL_VERSION(tf_version):
         'refering to the previous COMMIT to compile properly by themselves.')
     return target_bazel
   elif tf_version >= "2.0.0":
-    target_bazel = "5.1.1"
+    target_bazel = "5.3.0"
     logging.info(
         'To ensure code compatibility with Bazel rules_foreign_cc component, '
-        'we specify Bazel version greater than 5.1.1 '
+        'we specify Bazel version greater than 5.3.0 '
         'for Tensorflow versions greater than 2.0.0.')
     return target_bazel
   else:
@@ -127,6 +127,7 @@ def get_tf_version_integer():
     2.4.1 get 2041
     2.6.3 get 2063
     2.8.3 get 2083
+    2.11.1 get 2111
 
   The 4-digits-string will be passed to C macro to discriminate different
   Tensorflow versions. 
@@ -141,7 +142,7 @@ def get_tf_version_integer():
         '\nPlease install a TensorFlow on your compiling machine, '
         'The compiler needs to know the version of Tensorflow '
         'and get TF c++ headers according to the installed TensorFlow. '
-        '\nNote: Only TensorFlow 2.8.3, 2.6.3, 2.4.1, 1.15.2 are supported.')
+        '\nNote: Only TensorFlow 2.11.1, 2.8.3, 2.6.3, 2.4.1, 1.15.2 are supported.')
   try:
     major, minor, patch = version.split('.')
     assert len(

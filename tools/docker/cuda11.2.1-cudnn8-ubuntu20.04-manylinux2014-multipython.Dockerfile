@@ -40,13 +40,13 @@ ADD devtoolset/rpm-patch.sh rpm-patch.sh
 
 # Set up a sysroot for glibc 2.12 / libstdc++ 4.4 / devtoolset-7 in /dt7.
 RUN /build_devtoolset.sh devtoolset-7 /dt7
-# Set up a sysroot for glibc 2.12 / libstdc++ 4.4 / devtoolset-8 in /dt8.
-RUN /build_devtoolset.sh devtoolset-8 /dt8
+# Set up a sysroot for glibc 2.17 / libstdc++ 4.8 / devtoolset-9 in /dt9.
+RUN /build_devtoolset.sh devtoolset-9 /dt9
 
 # TODO(klimek): Split up into two different docker images.
 FROM nvidia/cuda:11.2.1-cudnn8-devel-ubuntu20.04
 COPY --from=devtoolset /dt7 /dt7
-COPY --from=devtoolset /dt8 /dt8
+COPY --from=devtoolset /dt9 /dt9
 
 # Install TensorRT.
 RUN echo \
@@ -78,6 +78,11 @@ RUN apt-get update && apt-get install -y \
     libreadline-dev \
     patchelf \
     gcc-multilib \
+    cmake \
+    openmpi-bin \
+    openmpi-common \
+    libopenmpi-dev \
+    libgtk2.0-dev \
       && \
     rm -rf /var/lib/apt/lists/*
 
@@ -91,25 +96,22 @@ COPY install/install_rocksdb.sh /install/
 RUN /install/install_rocksdb.sh "6.22.1"
 
 COPY install/install_bazel.sh /install/
-RUN /install/install_bazel.sh "5.1.1"
+RUN /install/install_bazel.sh "5.3.0"
 
 COPY install/build_and_install_python.sh /install/
-RUN /install/build_and_install_python.sh "3.7.7"
+#RUN /install/build_and_install_python.sh "3.7.7"
 RUN /install/build_and_install_python.sh "3.8.2"
-RUN /install/build_and_install_python.sh "3.9.7"
-RUN /install/build_and_install_python.sh "3.10.6"
+#RUN /install/build_and_install_python.sh "3.9.7"
+#RUN /install/build_and_install_python.sh "3.10.6"
 
 COPY install/install_pip_packages_by_version.sh /install/
-RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.10"
-RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.9"
+#RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.10"
+#RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.9"
 RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.8"
-RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.7"
+#RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.7"
 
-COPY install/use_devtoolset_7.sh /install/
-RUN /install/use_devtoolset_7.sh
-
-COPY install/install_openmpi.sh /install/
-RUN /install/install_openmpi.sh "4.1.1"
+COPY install/use_devtoolset_9.sh /install/
+RUN /install/use_devtoolset_9.sh
 
 # clean
 RUN rm -rf /tmp/*

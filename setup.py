@@ -50,9 +50,6 @@ def get_project_name_version():
 
   project_name = "tensorflow-recommenders-addons"
   version["tf_project_name"] = "tensorflow"
-  if os.getenv("TF_NEED_CUDA", "0") == "1":
-    project_name = project_name + "-gpu"
-    version["tf_project_name"] = "tensorflow-gpu"
 
   if "--nightly" in sys.argv:
     project_name = "tfra-nightly"
@@ -114,6 +111,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "Topic :: Scientific/Engineering :: Mathematics",
         "Topic :: Software Development :: Libraries :: Python Modules",
         "Topic :: Software Development :: Libraries",

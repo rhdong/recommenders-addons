@@ -22,17 +22,27 @@ ARG PY_VERSION
 RUN ln -sf /usr/local/bin/python$PY_VERSION /usr/bin/python
 
 ENV PATH=/dt7/usr/bin:${PATH}
-ENV LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH}
+ENV PATH=/usr/local/bin/:${PATH}
+ENV PATH=/usr/local/:${PATH}
+ENV LD_LIBRARY_PATH=/usr/local/lib/openmpi/:${LD_LIBRARY_PATH}
 ENV LD_LIBRARY_PATH=/dt7/user/lib64:${LD_LIBRARY_PATH}
 ENV LD_LIBRARY_PATH=/dt7/user/lib:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=/usr/local/lib/:${LD_LIBRARY_PATH}
 ENV MANPATH=/dt7/user/share/man:${LD_LIBRARY_PATH}
 ENV INFOPATH=/dt7/user/share/info
+ENV MPI_HOME=/usr/local/lib/openmpi/
 
 ARG TF_VERSION
 ARG TF_NAME
 ARG HOROVOD_VERSION
 
-RUN python -m pip install --default-timeout=1000 $TF_NAME==$TF_VERSION
+RUN python -m pip install --default-timeout=1000 tensorflow-cpu==$TF_VERSION
+RUN python -m pip install --upgrade pip
+
+RUN echo $PATH
+RUN echo $LD_LIBRARY_PATH
+RUN echo $(whereis mpirun)
 
 COPY tools/docker/install/install_horovod.sh /install/
 RUN /install/install_horovod.sh $HOROVOD_VERSION
@@ -88,7 +98,8 @@ FROM python:$PY_VERSION as test_wheel_in_fresh_environment
 
 ARG TF_VERSION
 ARG TF_NAME
-RUN python -m pip install --default-timeout=1000 $TF_NAME==$TF_VERSION
+
+RUN python -m pip install --upgrade --default-timeout=1000 $TF_NAME==$TF_VERSION
 
 RUN python -m pip install --upgrade protobuf==3.20.0
 

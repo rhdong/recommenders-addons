@@ -112,6 +112,7 @@ is compiled differently. A typical example of this would be `conda`-installed Te
 | 0.5.1 | 2.8.3      | GCC 7.3.1  | 11.2 | 8.1   | 6.0, 6.1, 7.0, 7.5, 8.0, 8.6 | x86 |
 | 0.5.1 | 2.6.0      | Xcode 13.1 | -    | -     | -                            | Apple M1      |
 | 0.5.0 | 2.8.3      | GCC 7.3.1  | 11.2 | 8.1   | 6.0, 6.1, 7.0, 7.5, 8.0, 8.6 | x86 |
+| 0.5.1 | 2.6.0      | Xcode 13.1 | -    | -     | -                            | Apple M1      |
 | 0.5.0 | 2.6.0      | Xcode 13.1 | -    | -     | -                            | Apple M1      |
 | 0.4.0 | 2.5.1      | GCC 7.3.1  | 11.2 | 8.1   | 6.0, 6.1, 7.0, 7.5, 8.0, 8.6 | x86 |
 | 0.4.0 | 2.5.0      | Xcode 13.1 | -    | -     | -                            | Apple M1      |
@@ -149,12 +150,12 @@ docker run --privileged --gpus all -it --rm -v $(pwd):$(pwd) tfra/dev_container:
 ```
 
 #### CPU Only
-You can also install from source. This requires the [Bazel](https://bazel.build/) build system (version == 5.1.1).
+You can also install from source. This requires the [Bazel](https://bazel.build/) build system (version == 5.3.0).
 Please install a TensorFlow on your compiling machine, The compiler needs to know the version of Tensorflow and 
 its headers according to the installed TensorFlow. 
 
 ```sh
-export TF_VERSION="2.8.3"  # "2.6.3" are well tested.
+export TF_VERSION="2.11.1"  # "2.8.3" are well tested.
 pip install tensorflow[-gpu]==$TF_VERSION
 
 git clone https://github.com/tensorflow/recommenders-addons.git
@@ -171,7 +172,7 @@ pip install artifacts/tensorflow_recommenders_addons-*.whl
 #### GPU Support
 Only `TF_NEED_CUDA=1` is required and other environment variables are optional:
 ```sh
-export TF_VERSION="2.8.3"  # "2.6.3" is well tested.
+export TF_VERSION="2.11.1"  # "2.8.3" is well tested.
 export PY_VERSION="3.8" 
 export TF_NEED_CUDA=1
 export TF_CUDA_VERSION=11.2
@@ -290,7 +291,7 @@ sess_config.gpu_options.allow_growth = True
 | 0.3.1 | 2.5.1      | 2.5.2  | GCC 7.3.1 | 11.2| 8.1 | 6.0, 6.1, 7.0, 7.5, 8.0, 8.6 |
 | 0.2.0 | 2.4.1      | 2.4.0  | GCC 7.3.1 | 11.0 | 8.0 | 6.0, 6.1, 7.0, 7.5, 8.0 |
 | 0.2.0 | 1.15.2     | 1.15.0  | GCC 7.3.1 | 10.0 | 7.6 | 6.0, 6.1, 7.0, 7.5 |
-| 0.1.0 | 2.4.1      | 2.4.0  | GCC 7.3.1 | - | - | - |
+| 0.1.0 | 2.4.1      | 2.4.0   | GCC 7.3.1 | - | - | - |
 
 **NOTICE**：Reference documents: https://www.tensorflow.org/tfx/serving/custom_op
 
