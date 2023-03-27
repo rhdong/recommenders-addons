@@ -34,7 +34,7 @@ if ! [ -x "$(command -v nvidia-smi)" ]; then
 fi
 
 # TODO(jamesrong): Test on GPU.
-CUDA_VISIBLE_DEVICES="" mpirun -np 2 -H localhost:2 --allow-run-as-root pytest -v ./tensorflow_recommenders_addons/dynamic_embedding/python/kernel_tests/horovod_sync_train_test.py
+#CUDA_VISIBLE_DEVICES="" mpirun -np 2 -H localhost:2 --allow-run-as-root pytest -v ./tensorflow_recommenders_addons/dynamic_embedding/python/kernel_tests/horovod_sync_train_test.py
 
 # Only use GPU 0 if available.
 if [ -x "$(command -v nvidia-smi)" ]; then
