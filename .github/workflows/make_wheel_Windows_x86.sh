@@ -9,7 +9,7 @@ fi
 
 python -m pip install --default-timeout=1000 wheel setuptools==50.0.0 tensorflow==$TF_VERSION horovod==$HOROVOD_VERSION
 python -m pip install tensorflow-io
-python -m pip install --upgrade protobuf==3.20.0
+python -m pip install --upgrade protobuf==3.19.6
 
 bash ./tools/testing/build_and_run_tests.sh
 

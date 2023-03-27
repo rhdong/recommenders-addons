@@ -45,7 +45,7 @@ RUN python -m pip install -r requirements.txt
 
 RUN python -m pip install tensorflow-io
 
-RUN python -m pip install --upgrade protobuf==3.20.0
+RUN python -m pip install --upgrade protobuf==3.19.6
 
 COPY ./ /recommenders-addons
 WORKDIR /recommenders-addons
@@ -90,7 +90,7 @@ ARG TF_VERSION
 ARG TF_NAME
 RUN python -m pip install --default-timeout=1000 tensorflow-cpu==$TF_VERSION
 
-RUN python -m pip install --upgrade protobuf==3.20.0
+RUN python -m pip install --upgrade protobuf==3.19.6
 
 COPY --from=make_wheel /recommenders-addons/wheelhouse/ /recommenders-addons/wheelhouse/
 RUN pip install /recommenders-addons/wheelhouse/*.whl
