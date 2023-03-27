@@ -88,7 +88,7 @@ FROM python:$PY_VERSION as test_wheel_in_fresh_environment
 
 ARG TF_VERSION
 ARG TF_NAME
-RUN python -m pip install --default-timeout=1000 $TF_NAME==$TF_VERSION
+RUN python -m pip install --default-timeout=1000 tensorflow-cpu==$TF_VERSION
 
 RUN python -m pip install --upgrade protobuf==3.20.0
 
