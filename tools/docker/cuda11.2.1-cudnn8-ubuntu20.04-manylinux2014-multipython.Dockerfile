@@ -79,21 +79,17 @@ RUN apt-get update && apt-get install -y \
     patchelf \
     gcc-multilib \
     cmake \
-    openmpi-bin \
-    openmpi-common \
-    libopenmpi-dev \
-    libgtk2.0-dev \
       && \
     rm -rf /var/lib/apt/lists/*
 
 RUN chmod 777 /tmp/
 WORKDIR /tmp/
 
-COPY install/install_nccl.sh /install/
-RUN /install/install_nccl.sh "2.8.4-1+cuda11.2"
+#COPY install/install_nccl.sh /install/
+#RUN /install/install_nccl.sh "2.8.4-1+cuda11.2"
 
-COPY install/install_rocksdb.sh /install/
-RUN /install/install_rocksdb.sh "6.22.1"
+#COPY install/install_rocksdb.sh /install/
+#RUN /install/install_rocksdb.sh "6.22.1"
 
 COPY install/install_bazel.sh /install/
 RUN /install/install_bazel.sh "5.3.0"
@@ -112,6 +108,14 @@ RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.8"
 
 COPY install/use_devtoolset_9.sh /install/
 RUN /install/use_devtoolset_9.sh
+
+RUN apt-get update && apt-get install -y \
+    openmpi-bin \
+    openmpi-common \
+    libopenmpi-dev \
+    libgtk2.0-dev \
+      && \
+    rm -rf /var/lib/apt/lists/* \
 
 # clean
 RUN rm -rf /tmp/*
