@@ -109,13 +109,13 @@ RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.8"
 COPY install/use_devtoolset_9.sh /install/
 RUN /install/use_devtoolset_9.sh
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get install -y \
     openmpi-bin \
     openmpi-common \
     libopenmpi-dev \
     libgtk2.0-dev \
       && \
-    rm -rf /var/lib/apt/lists/* 
+    rm -rf /var/lib/apt/lists/*
 
 COPY install/install_horovod.sh /install/
 RUN /install/install_horovod.sh "0.23.0"
