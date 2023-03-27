@@ -115,10 +115,10 @@ RUN apt-get update && apt-get install -y \
     libopenmpi-dev \
     libgtk2.0-dev \
       && \
-    rm -rf /var/lib/apt/lists/* 
+    rm -rf /var/lib/apt/lists/*
 
-COPY install/install_horovod.sh /install/
-RUN /install/install_horovod.sh "0.23.0"
+#COPY install/install_horovod.sh /install/
+#RUN /install/install_horovod.sh "0.23.0"
 
 # clean
 RUN rm -rf /tmp/*
