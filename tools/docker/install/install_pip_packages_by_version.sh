@@ -60,7 +60,6 @@ PACKAGES=(
   "dill"
   "tblib"
   "tensorflow-cpu==2.11.1"
-  "horovod==0.27.0"
 )
 
 # tf.mock require the following for python2:
@@ -70,7 +69,6 @@ fi
 
 # Get the latest version of pip so it recognize manylinux2010
 "${PIP}" "install" "--upgrade" "pip"
-"${PIP}" "uninstall" "tensorflow-cpu" "-y"
 
 "${PIP_INSTALL[@]}" "${PACKAGES[@]}"
 
