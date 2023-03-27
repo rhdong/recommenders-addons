@@ -28,7 +28,7 @@ if [ -z $HOROVOD_VERSION ] ; then
   export HOROVOD_VERSION='0.23.0'
 fi
 
-DOCKER_BUILDKIT=1 docker build --no-cache \
+DOCKER_BUILDKIT=1 docker build \
     -f tools/docker/build_wheel.Dockerfile \
     --output type=local,dest=wheelhouse \
     --build-arg PY_VERSION \
