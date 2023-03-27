@@ -34,8 +34,8 @@ ARG HOROVOD_VERSION
 
 RUN python -m pip install --default-timeout=1000 tensorflow-cpu==$TF_VERSION
 
-COPY tools/docker/install/install_horovod.sh /install/
-RUN /install/install_horovod.sh $HOROVOD_VERSION
+#COPY tools/docker/install/install_horovod.sh /install/
+#RUN /install/install_horovod.sh $HOROVOD_VERSION
 
 COPY tools/install_deps/ /install_deps
 RUN python -m pip install -r /install_deps/pytest.txt
