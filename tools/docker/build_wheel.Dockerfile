@@ -32,7 +32,7 @@ ARG TF_VERSION
 ARG TF_NAME
 ARG HOROVOD_VERSION
 
-RUN python -m pip install --default-timeout=1000 $TF_NAME==$TF_VERSION
+RUN python -m pip install --default-timeout=1000 tensorflow-cpu==$TF_VERSION
 
 COPY tools/docker/install/install_horovod.sh /install/
 RUN /install/install_horovod.sh $HOROVOD_VERSION
