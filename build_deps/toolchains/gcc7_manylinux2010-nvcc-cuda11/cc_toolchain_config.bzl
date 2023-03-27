@@ -1248,12 +1248,12 @@ def _impl(ctx):
         ],
     )
 
-    cpp14_feature = feature(
-        name = "c++14",
+    cpp17_feature = feature(
+        name = "c++17",
         flag_sets = [
             flag_set(
                 actions = [ACTION_NAMES.cpp_compile],
-                flag_groups = [flag_group(flags = ["-std=c++14"])],
+                flag_groups = [flag_group(flags = ["-std=c++17"])],
             ),
         ],
     )
@@ -1263,7 +1263,7 @@ def _impl(ctx):
             name = "common",
             implies = [
                 "stdlib",
-                "c++14",
+                "c++17",
                 "determinism",
                 "alwayslink",
                 "hardening",
@@ -1279,7 +1279,7 @@ def _impl(ctx):
             name = "common",
             implies = [
                 "stdlib",
-                "c++14",
+                "c++17",
                 "determinism",
                 "hardening",
                 "warnings",
@@ -1294,7 +1294,7 @@ def _impl(ctx):
 
     if (ctx.attr.cpu == "local"):
         features = [
-            cpp14_feature,
+            cpp17_feature,
             stdlib_feature,
             determinism_feature,
             alwayslink_feature,
@@ -1315,7 +1315,7 @@ def _impl(ctx):
         ]
     elif (ctx.attr.cpu == "darwin"):
         features = [
-            cpp14_feature,
+            cpp17_feature,
             stdlib_feature,
             determinism_feature,
             pic_feature,
