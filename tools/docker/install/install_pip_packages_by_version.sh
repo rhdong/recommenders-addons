@@ -28,7 +28,7 @@ fi
 PACKAGES=(
   "auditwheel==4.0.0"
   "wheel"
-  "setuptools"
+  "setuptools==50.0.0"
   "virtualenv"
   "six"
   "future"
@@ -59,8 +59,6 @@ PACKAGES=(
   "dm-tree"
   "dill"
   "tblib"
-  "tensorflow==2.6.3"
-  "horovod==0.23.0"
 )
 
 # tf.mock require the following for python2:

@@ -7,7 +7,7 @@ if [ -z $HOROVOD_VERSION ] ; then
   export HOROVOD_VERSION='0.23.0'
 fi
 
-python -m pip install --default-timeout=1000 wheel setuptools tensorflow==$TF_VERSION horovod==$HOROVOD_VERSION
+python -m pip install --default-timeout=1000 wheel setuptools==50.0.0 tensorflow==$TF_VERSION horovod==$HOROVOD_VERSION
 python -m pip install tensorflow-io
 python -m pip install --upgrade protobuf==3.20.0
 

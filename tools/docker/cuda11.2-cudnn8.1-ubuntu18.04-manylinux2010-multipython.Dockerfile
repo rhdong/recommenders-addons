@@ -84,7 +84,7 @@ COPY install/install_rocksdb.sh /install/
 RUN /install/install_rocksdb.sh "6.22.1"
 
 COPY install/install_bazel.sh /install/
-RUN /install/install_bazel.sh "5.3.0"
+RUN /install/install_bazel.sh "5.1.1"
 
 COPY install/build_and_install_python.sh /install/
 RUN /install/build_and_install_python.sh "3.6.9"

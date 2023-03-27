@@ -26,7 +26,7 @@ RUN pip install -r /install_deps/yapf.txt \
     -r /install_deps/typedapi.txt \
     -r /tmp/requirements.txt
 
-RUN pip install setuptools
+RUN pip install setuptools==50.0.0
 
 RUN bash /install_deps/buildifier.sh
 RUN bash /install_deps/clang-format.sh
