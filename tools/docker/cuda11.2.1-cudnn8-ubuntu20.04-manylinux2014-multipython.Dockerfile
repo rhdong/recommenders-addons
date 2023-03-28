@@ -105,11 +105,11 @@ RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.9"
 RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.8"
 RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.7"
 
-COPY install/install_openmpi.sh /install/
-RUN /install/install_openmpi.sh "4.1.1"
-
 COPY install/use_devtoolset_7.sh /install/
 RUN /install/use_devtoolset_7.sh
+
+COPY install/install_openmpi.sh /install/
+RUN /install/install_openmpi.sh "4.1.1"
 
 # clean
 RUN rm -rf /tmp/*
