@@ -46,7 +46,7 @@ RUN /build_devtoolset.sh devtoolset-9 /dt9
 # TODO(klimek): Split up into two different docker images.
 FROM nvidia/cuda:11.2.1-cudnn8-devel-ubuntu20.04
 COPY --from=devtoolset /dt7 /dt7
-#COPY --from=devtoolset /dt9 /dt9
+COPY --from=devtoolset /dt9 /dt9
 
 # Install TensorRT.
 RUN echo \
@@ -105,11 +105,11 @@ RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.9"
 RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.8"
 RUN /install/install_pip_packages_by_version.sh "/usr/local/bin/pip3.7"
 
-COPY install/use_devtoolset_7.sh /install/
-RUN /install/use_devtoolset_7.sh
-
 COPY install/install_openmpi.sh /install/
 RUN /install/install_openmpi.sh "4.1.1"
+
+COPY install/use_devtoolset_9.sh /install/
+RUN /install/use_devtoolset_9.sh
 
 # clean
 RUN rm -rf /tmp/*
