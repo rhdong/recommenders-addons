@@ -41,7 +41,7 @@ ADD devtoolset/rpm-patch.sh rpm-patch.sh
 # Set up a sysroot for glibc 2.12 / libstdc++ 4.4 / devtoolset-7 in /dt7.
 RUN /build_devtoolset.sh devtoolset-7 /dt7
 # Set up a sysroot for glibc 2.17 / libstdc++ 4.8 / devtoolset-9 in /dt9.
-RUN /build_devtoolset.sh devtoolset-9 /dt9
+#RUN /build_devtoolset.sh devtoolset-9 /dt9
 
 # TODO(klimek): Split up into two different docker images.
 FROM nvidia/cuda:11.2.1-cudnn8-devel-ubuntu20.04
