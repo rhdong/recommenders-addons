@@ -16,13 +16,14 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-cmake_external(
+cmake(
     name = "hiredis",
-    cmake_options = [
+    generate_args = [
         "-DCMAKE_BUILD_TYPE=Release",
         "-DCMAKE_CXX_FLAGS="+D_GLIBCXX_USE_CXX11_ABI,
+        "-DCMAKE_INSTALL_LIBDIR=lib",
     ],
     lib_source = "@hiredis//:all_srcs",
-    static_libraries = ["libhiredis.a"],
+    out_static_libs = ["libhiredis.a"],
 )
 
