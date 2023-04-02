@@ -24,6 +24,6 @@ cmake_external(
         "-DCMAKE_INSTALL_LIBDIR=lib",
     ],
     lib_source = "@hiredis//:all_srcs",
-    static_libraries = ["libhiredis.a"],
+    static_libraries = ["libhiredis_static.a"],
 )
 
