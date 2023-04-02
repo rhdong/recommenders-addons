@@ -26,4 +26,3 @@ cmake_external(
     lib_source = "@hiredis//:all_srcs",
     static_libraries = ["libhiredis_static.a"],
 )
-
