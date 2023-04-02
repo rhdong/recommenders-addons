@@ -2,7 +2,7 @@
 FROM python:3.6 as build_wheel
 
 ARG TF_VERSION=2.5.1
-ARG USE_BAZEL_VERSION=5.1.1
+ARG USE_BAZEL_VERSION=3.7.2
 
 RUN pip install --default-timeout=1000 tensorflow-cpu==$TF_VERSION
 

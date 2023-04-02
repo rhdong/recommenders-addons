@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 
 set -x -e
-docker build \
+
+DOCKER_BUILDKIT=1 docker build \
     -f tools/docker/dev_container.Dockerfile \
     --build-arg TF_VERSION=2.5.1 \
-    --build-arg TF_PACKAGE=tensorflow-gpu \
-    --build-arg PY_VERSION=$PY_VERSION \
-    --no-cache \
-    --target dev_container \
-    -t tfra/dev_container:latest-python$PY_VERSION ./
+    --build-arg TF_PACKAGE=tensorflow-cpu \
+    --target dev_container_cpu \
+    -t tfaddons/dev_container:latest-cpu ./
