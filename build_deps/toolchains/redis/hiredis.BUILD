@@ -23,6 +23,6 @@ cmake_external(
         "-DCMAKE_CXX_FLAGS="+D_GLIBCXX_USE_CXX11_ABI,
     ],
     lib_source = "@hiredis//:all_srcs",
-    static_libraries = ["libhiredis_static.a"],
+    static_libraries = ["libhiredis.a"],
 )
 
