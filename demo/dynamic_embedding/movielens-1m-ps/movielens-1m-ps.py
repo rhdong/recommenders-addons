@@ -42,11 +42,14 @@ class Trainer():
     split = 'train[{}%:{}%]'.format(split_start, split_start + split_size - 1)
     print("dataset split, worker{}: {}".format(self.worker_id, split))
     ratings = tfds.load("movielens/1m-ratings", split=split)
+
+    # user_rating = ratings.map(
+    #   lambda x: tf.one_hot(tf.cast(x['user_rating'] - 1, dtype=tf.int64), 5))
     ratings = ratings.map(
         lambda x: {
             "movie_id": tf.strings.to_number(x["movie_id"], tf.int64),
             "user_id": tf.strings.to_number(x["user_id"], tf.int64),
-            "user_rating": x["user_rating"]
+            "user_rating": tf.one_hot(tf.cast(x['user_rating'] - 1, dtype=tf.int64), 5)
         })
     shuffled = ratings.shuffle(1_000_000,
                                seed=2021,
@@ -56,21 +59,28 @@ class Trainer():
     return train_iter
 
   def build_graph(self, batch):
-    movie_id = batch["movie_id"]
-    user_id = batch["user_id"]
     rating = batch["user_rating"]
 
-    d0 = Dense(256,
+    movie_id = batch['movie_id']
+    user_id = batch['user_id']
+
+    d0 = Dense(64,
                activation='relu',
                kernel_initializer=tf.keras.initializers.RandomNormal(0.0, 0.1),
                bias_initializer=tf.keras.initializers.RandomNormal(0.0, 0.1))
-    d1 = Dense(64,
+    d1 = Dense(16,
                activation='relu',
                kernel_initializer=tf.keras.initializers.RandomNormal(0.0, 0.1),
                bias_initializer=tf.keras.initializers.RandomNormal(0.0, 0.1))
-    d2 = Dense(1,
+    d2 = Dense(5,
+               activation='softmax',
                kernel_initializer=tf.keras.initializers.RandomNormal(0.0, 0.1),
                bias_initializer=tf.keras.initializers.RandomNormal(0.0, 0.1))
+    bias_net = Dense(5,
+                     activation='softmax',
+                     kernel_initializer=tf.keras.initializers.RandomNormal(0.0, 0.1),
+                     bias_initializer=tf.keras.initializers.RandomNormal(0.0, 0.1))
+
     user_embeddings = tfra.dynamic_embedding.get_variable(
         name="user_dynamic_embeddings",
         dim=self.embedding_size,
@@ -102,16 +112,21 @@ class Trainer():
     dnn = d0(embeddings)
     dnn = d1(dnn)
     dnn = d2(dnn)
-    predict = tf.reshape(dnn, shape=[-1])
+    # predict = tf.reshape(dnn, shape=[-1])
+    bias = bias_net(embeddings)
+    predict = 0.2 * dnn + 0.8 * bias
+    predict = tf.reshape(predict, shape=[-1, 5])
     loss = tf.keras.losses.MeanSquaredError()(rating, predict)
     optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=0.001)
     optimizer = tfra.dynamic_embedding.DynamicEmbeddingOptimizer(optimizer)
     update = optimizer.minimize(
         loss, global_step=tf.compat.v1.train.get_or_create_global_step())
+    auc = tf.compat.v1.metrics.auc(rating, predict, num_thresholds=1000)
     return {
         "update": update,
         "predict": predict,
         "loss": loss,
+        "auc": auc,
         "size": user_embeddings.size(),
     }
 
@@ -161,13 +176,14 @@ def start_worker(worker_id, config):
     while True:
       step += 1
       try:
-        _, _loss, _pred = sess.run(
-            [outputs["update"], outputs["loss"], outputs["predict"]])
+        _, _loss, _auc, _pred = sess.run(
+            [outputs["update"], outputs["loss"], outputs["auc"], outputs["predict"]])
 
         _size = sess.run(outputs["size"])
-        if step % 100 == 0:
-          print("[worker{}]step{}:\tloss={:.4f}\t size={}".format(
-              worker_id, step, float(_loss), _size))
+        if step == 15400:
+          print(_auc)
+          print("[worker{}]step{}:\tloss={:.4f}\tauc={:.4f}\t size={}".format(
+              worker_id, step, float(_loss), float(_auc[0]), _size))
       except tf.errors.OutOfRangeError:
         print("[worker{}]no more data!".format(worker_id))
         break
