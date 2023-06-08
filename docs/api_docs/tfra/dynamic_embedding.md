@@ -29,8 +29,6 @@ Export dynamic_embedding APIs.
 
 [`keras`](../tfra/dynamic_embedding/keras.md) module
 
-[`math`](../tfra/dynamic_embedding/math.md) module: math operations.
-
 [`shadow_ops`](../tfra/dynamic_embedding/shadow_ops.md) module: Dynamic Embedding is designed for Large-scale Sparse Weights Training.
 
 ## Classes

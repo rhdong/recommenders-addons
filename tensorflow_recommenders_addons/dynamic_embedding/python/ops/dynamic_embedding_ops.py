@@ -828,12 +828,12 @@ def embedding_lookup_sparse(
     else:
       assert idx is not None
       if combiner == "sum":
-        embeddings = de.math.sparse_segment_sum(embeddings,
+        embeddings = math_ops.sparse_segment_sum(embeddings,
                                                 idx,
                                                 segment_ids,
                                                 name=name)
       elif combiner == "mean":
-        embeddings = math_ops.sparse_segment_mean(embeddings,
+          embeddings = math_ops.sparse_segment_mean(embeddings,
                                                   idx,
                                                   segment_ids,
                                                   name=name)
@@ -923,7 +923,7 @@ def safe_embedding_lookup_sparse(
         sparse_ids.dense_shape.get_shape()[0])
     original_rank = (array_ops.size(original_shape)
                      if original_rank_dim is None else original_rank_dim)
-    sparse_ids = de.math.sparse_reshape(
+    sparse_ids = sparse_ops.sparse_reshape(
         sparse_ids,
         [
             math_ops.reduce_prod(
@@ -942,10 +942,10 @@ def safe_embedding_lookup_sparse(
           sparse_ids, sparse_weights)
 
     # Fill in dummy values for empty features, if necessary.
-    sparse_ids, is_row_empty = de.math.sparse_fill_empty_rows(
+    sparse_ids, is_row_empty = sparse_ops.sparse_fill_empty_rows(
         sparse_ids, default_id or 0)
     if sparse_weights is not None:
-      sparse_weights, _ = de.math.sparse_fill_empty_rows(sparse_weights, 1.0)
+      sparse_weights, _ = sparse_ops.sparse_fill_empty_rows(sparse_weights, 1.0)
 
     result, trainable_ = embedding_lookup_sparse(
         embedding_weights,
