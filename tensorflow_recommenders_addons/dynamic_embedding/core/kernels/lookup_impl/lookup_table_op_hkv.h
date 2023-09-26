@@ -199,10 +199,31 @@ class TFOrDefaultAllocator : public nv::merlin::BaseAllocator {
     if (!use_default_allocator_) {
       switch (type) {
         case NMMemType::Device:
+          if(size >= 1024 * 1024) {
+            printf("request device, size=%zu\n", size);
+          }
           *ptr = tf_device_allocator_->AllocateRaw(kAllocatorAlignment, size);
+
+          cudaPointerAttributes attributes;
+          cudaError_t err = cudaPointerGetAttributes(&attributes, *ptr);
+
+          if(err != 0 || size >= 1024 * 1024) {
+            printf("request device, err=%d, type=%d, is_managed=%d\n", err, attributes.type, attributes.is_managed);
+          }
+
           break;
         case NMMemType::Pinned:
+          if(size >= 1024 * 1024) {
+            printf("request pinned, size=%zu\n", size);
+          }
           CUDA_CHECK(cudaMallocHost(ptr, size, pinned_flags));
+
+          cudaPointerAttributes attributes;
+          cudaError_t err = cudaPointerGetAttributes(&attributes, *ptr);
+
+          if(err != 0 || size >= 1024 * 1024) {
+            printf("request pinned, err=%d, type=%d, is_managed=%d\n", err, attributes.type, attributes.is_managed);
+          }
           break;
         case NMMemType::Host:
           *ptr = std::malloc(size);
