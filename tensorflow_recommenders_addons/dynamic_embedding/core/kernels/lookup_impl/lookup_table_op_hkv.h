@@ -197,6 +197,7 @@ class TFOrDefaultAllocator : public nv::merlin::BaseAllocator {
   void alloc(const NMMemType type, void** ptr, size_t size,
              unsigned int pinned_flags = cudaHostAllocDefault) override {
     if (!use_default_allocator_) {
+      printf("!!!!not use_default_allocator_\n");
       switch (type) {
         case NMMemType::Device:
           *ptr = tf_device_allocator_->AllocateRaw(kAllocatorAlignment, size);
@@ -209,6 +210,7 @@ class TFOrDefaultAllocator : public nv::merlin::BaseAllocator {
           break;
       }
     } else {
+      printf("--->>>use_default_allocator_\n");
       default_allocator_->alloc(type, ptr, size, pinned_flags);
     }
   }
