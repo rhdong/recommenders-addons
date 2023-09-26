@@ -202,7 +202,10 @@ class TFOrDefaultAllocator : public nv::merlin::BaseAllocator {
       switch (type) {
         case NMMemType::Device:
           if(size >= 1024 * 1024) {
-            printf("request device, size=%zu\n", size);
+            size_t free, total;
+            CUDA_CHECK(cudaSetDevice(0));
+            CUDA_CHECK(cudaMemGetInfo(&free, &total));
+            printf("request device, size=%zu, free=%zu, total=%zu\n", size, free, total);
           }
           *ptr = tf_device_allocator_->AllocateRaw(kAllocatorAlignment, size);
 
