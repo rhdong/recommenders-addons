@@ -200,15 +200,12 @@ class TFOrDefaultAllocator : public nv::merlin::BaseAllocator {
       printf("!!!!not use_default_allocator_\n");
       switch (type) {
         case NMMemType::Device:
-          printf("!!!!!!!!!!!!!!!!!!!!!!!!---------Device size: %zu\n", size);
           *ptr = tf_device_allocator_->AllocateRaw(kAllocatorAlignment, size);
           break;
         case NMMemType::Pinned:
-          printf("!!!!!!!!!!!!!!!!!!!!!!!!---------Pinned size: %zu\n", size);
           CUDA_CHECK(cudaMallocHost(ptr, size, pinned_flags));
           break;
         case NMMemType::Host:
-          printf("!!!!!!!!!!!!!!!!!!!!!!!!---------Host size: %zu\n", size);
           *ptr = std::malloc(size);
           break;
       }
