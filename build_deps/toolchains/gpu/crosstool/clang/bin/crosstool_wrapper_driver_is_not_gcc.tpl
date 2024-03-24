@@ -226,7 +226,7 @@ def InvokeNvcc(argv, log=False):
       return exit_status
 
   cmd = (NVCC_PATH + ' ' + nvccopts +
-         ' --objdir-aasds-tempdir ' +
+         ' --objdir-as-tempdir ' +
          ' --compiler-options "' + host_compiler_options + ' -fPIC"' +
          ' --compiler-bindir=' + GCC_HOST_COMPILER_PATH +
          ' -I .' +
