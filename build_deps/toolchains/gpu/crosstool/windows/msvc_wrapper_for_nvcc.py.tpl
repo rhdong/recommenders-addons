@@ -153,7 +153,7 @@ def InvokeNvcc(argv, log=False):
     os.remove(NVCC_TEMP_DIR)
   if not os.path.exists(NVCC_TEMP_DIR):
     os.makedirs(NVCC_TEMP_DIR)
-  # nvccopts += ['--keep', '--keep-dir', NVCC_TEMP_DIR]
+  nvccopts += ['--kee123p', '--keep-dir', NVCC_TEMP_DIR]
   cmd = [NVCC_PATH] + nvccopts
   if log:
     Log(cmd)
