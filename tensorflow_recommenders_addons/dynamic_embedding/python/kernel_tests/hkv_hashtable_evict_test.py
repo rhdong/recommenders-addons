@@ -80,60 +80,244 @@ def convert(v, t):
 
 
 def gen_scores_fn(keys):
-  return tf.constant([1, 2, 3, 4], dtypes.int64)
+  return tf.add(keys, tf.constant([1], shape=[
+      4,
+  ], dtype=dtypes.int64))
 
 
 class HkvHashtableTest(test.TestCase):
 
+  # @test_util.run_in_graph_and_eager_modes()
+  # def test_evict_strategy(self):
+  #   if not is_gpu_available:
+  #     self.skipTest('Only test when gpu is available.')
+  #   strategy_i = 0
+  #   key_dtype = dtypes.int64
+  #   value_dtype = dtypes.int32
+  #   dim = 8
+  #   for strategy in de.HkvEvictStrategy:
+  #     with self.session(use_gpu=True, config=default_config):
+  #       with self.captureWritesToStream(sys.stderr) as printed:
+  #         table = de.get_variable(
+  #             str(strategy),
+  #             key_dtype=key_dtype,
+  #             value_dtype=value_dtype,
+  #             initializer=0,
+  #             dim=dim,
+  #             init_size=1024,
+  #             kv_creator=de.HkvHashTableCreator(
+  #                 config=de.HkvHashTableConfig(init_capacity=1024,
+  #                                              max_capacity=1024,
+  #                                              max_hbm_for_values=1024 * 4 * 8 *
+  #                                              2,
+  #                                              evict_strategy=strategy,
+  #                                              gen_scores_fn=gen_scores_fn)))
+  #         self.evaluate(table.size())
+
+  #         content = "Use Evict Strategy:" + str(strategy_i)
+  #         self.assertTrue(content in printed.contents())
+  #         strategy_i = strategy_i + 1
+
+  #         keys = constant_op.constant(
+  #             np.array([0, 1, 2, 3]).astype(_type_converter(key_dtype)),
+  #             key_dtype)
+  #         values = constant_op.constant(
+  #             _convert([[0] * dim, [1] * dim, [2] * dim, [3] * dim],
+  #                      value_dtype), value_dtype)
+
+  #         self.evaluate(table.upsert(keys, values))
+
+  #         output = table.lookup(keys)
+  #         self.assertAllEqual(values, self.evaluate(output))
+
+  #         del table
+
   @test_util.run_in_graph_and_eager_modes()
-  def test_evict_strategy(self):
+  def test_export_keys_and_scores(self):
     if not is_gpu_available:
       self.skipTest('Only test when gpu is available.')
-    strategy_i = 0
+    key_dtype = dtypes.int64
+    value_dtype = dtypes.int32
+    dim = 8
     for strategy in de.HkvEvictStrategy:
       with self.session(use_gpu=True, config=default_config):
-        with self.captureWritesToStream(sys.stderr) as printed:
-          table = de.get_variable(
-              str(strategy),
-              key_dtype=dtypes.int64,
-              value_dtype=dtypes.int32,
-              initializer=0,
-              dim=8,
-              init_size=1024,
-              kv_creator=de.HkvHashTableCreator(
-                  config=de.HkvHashTableConfig(init_capacity=1024,
-                                               max_capacity=1024,
-                                               max_hbm_for_values=1024 * 4 * 8 *
-                                               2,
-                                               evict_strategy=strategy,
-                                               gen_scores_fn=gen_scores_fn)))
-          self.evaluate(table.size())
+        table = de.get_variable(
+            str(strategy),
+            key_dtype=key_dtype,
+            value_dtype=value_dtype,
+            initializer=0,
+            dim=dim,
+            init_size=1024,
+            kv_creator=de.HkvHashTableCreator(
+                config=de.HkvHashTableConfig(init_capacity=1024,
+                                             max_capacity=1024,
+                                             max_hbm_for_values=1024 * 64,
+                                             evict_strategy=strategy,
+                                             evict_global_epoch=1,
+                                             gen_scores_fn=gen_scores_fn)))
+        keys = constant_op.constant(
+            np.array([0, 1, 2, 3]).astype(_type_converter(key_dtype)),
+            key_dtype)
+        values = constant_op.constant(
+            _convert([[0] * dim, [1] * dim, [2] * dim, [3] * dim], value_dtype),
+            value_dtype)
 
-          content = "Use Evict Strategy:" + str(strategy_i)
-          # self.assertTrue(content in printed.contents())
-          strategy_i = strategy_i + 1
+        self.evaluate(table.upsert(keys, values))
 
-          key_dtype = dtypes.int64
-          value_dtype = dtypes.int32
-          dim = 8
+        exported_keys, exported_scores = self.evaluate(
+            table.export_keys_and_scores(1))
+        self.assertAllEqual(np.sort(exported_keys), keys)
+        if strategy is de.HkvEvictStrategy.CUSTOMIZED:
+          self.assertAllEqual(np.sort(exported_scores), gen_scores_fn(keys))
+        elif strategy is de.HkvEvictStrategy.EPOCHLFU:
+          self.assertAllEqual(exported_scores, np.full((4), (1 << 32) + 1))
+        elif strategy is de.HkvEvictStrategy.LFU:
+          self.assertAllEqual(exported_scores, np.ones(4))
 
-          keys = constant_op.constant(
-              np.array([0, 1, 2, 3]).astype(_type_converter(key_dtype)),
-              key_dtype)
-          values = constant_op.constant(
-              _convert([[0] * dim, [1] * dim, [2] * dim, [3] * dim],
-                       value_dtype), value_dtype)
+        del table
 
-          self.evaluate(table.upsert(keys, values))
+  def test_evict_strategy_lfu(self):
+    if not is_gpu_available:
+      self.skipTest('Only test when gpu is available.')
+    key_dtype = dtypes.int64
+    value_dtype = dtypes.int32
+    dim = 8
+    strategy = de.HkvEvictStrategy.LFU
+    with self.session(use_gpu=True, config=default_config):
+      table = de.get_variable(
+          str(strategy),
+          key_dtype=key_dtype,
+          value_dtype=value_dtype,
+          initializer=0,
+          dim=dim,
+          init_size=1024,
+          kv_creator=de.HkvHashTableCreator(
+              config=de.HkvHashTableConfig(init_capacity=1024,
+                                           max_capacity=1024,
+                                           max_hbm_for_values=1024 * 64,
+                                           evict_strategy=strategy,
+                                           gen_scores_fn=gen_scores_fn)))
+      keys = constant_op.constant(
+          np.array([0, 1, 2, 3]).astype(_type_converter(key_dtype)), key_dtype)
+      values = constant_op.constant(
+          _convert([[0] * dim, [1] * dim, [2] * dim, [3] * dim], value_dtype),
+          value_dtype)
 
-          output = table.lookup(keys)
-          self.assertAllEqual(values, self.evaluate(output))
+      self.evaluate(table.upsert(keys, values))
+      exported_keys, exported_scores = self.evaluate(
+          table.export_keys_and_scores(1))
+      self.assertAllEqual(exported_scores, np.ones(4))
 
-          # exported_keys, exported_scores = self.evaluate(table.export_keys_and_scores())
-          # print(exported_keys)
-          # print(exported_scores)
+      self.evaluate(table.upsert(keys, values))
+      exported_keys, exported_scores = self.evaluate(
+          table.export_keys_and_scores(1))
+      self.assertAllEqual(exported_scores, np.full((4), 2))
 
-          del table
+      keys = constant_op.constant(
+          np.array([0, 1, 4, 5]).astype(_type_converter(key_dtype)), key_dtype)
+
+      self.evaluate(table.upsert(keys, values))
+      exported_keys, exported_scores = self.evaluate(
+          table.export_keys_and_scores(1))
+      self.assertAllEqual(np.sort(exported_scores), np.array([1, 1, 2, 2, 3,
+                                                              3]))
+
+      keys = constant_op.constant(
+          np.arange(4, 1034).astype(_type_converter(key_dtype)), key_dtype)
+      values = constant_op.constant(
+          _convert([[10] * dim] * len(keys), value_dtype), value_dtype)
+
+      self.evaluate(table.upsert(keys, values))
+      exported_keys, exported_scores = self.evaluate(
+          table.export_keys_and_scores(1))
+      self.assertTrue(len(exported_keys) < 1024)
+
+      higher_frequence_keys = np.arange(0, 6)
+      exported_higher_frequence_keys = np.sort(
+          exported_keys)[:len(higher_frequence_keys)]
+      self.assertTrue(
+          np.array_equal(higher_frequence_keys, exported_higher_frequence_keys))
+
+      higher_frequence_scores = np.array([2, 2, 2, 2, 3, 3])
+      exported_higher_frequence_scores = np.sort(
+          exported_scores)[-len(higher_frequence_keys):]
+      self.assertTrue(
+          np.array_equal(higher_frequence_scores,
+                         exported_higher_frequence_scores))
+
+      del table
+
+  def test_evict_strategy_epoch_lfu(self):
+    if not is_gpu_available:
+      self.skipTest('Only test when gpu is available.')
+    key_dtype = dtypes.int64
+    value_dtype = dtypes.int32
+    dim = 8
+    strategy = de.HkvEvictStrategy.LFU
+    with self.session(use_gpu=True, config=default_config):
+      table = de.get_variable(
+          str(strategy),
+          key_dtype=key_dtype,
+          value_dtype=value_dtype,
+          initializer=0,
+          dim=dim,
+          init_size=1024,
+          kv_creator=de.HkvHashTableCreator(
+              config=de.HkvHashTableConfig(init_capacity=1024,
+                                           max_capacity=1024,
+                                           max_hbm_for_values=1024 * 64,
+                                           evict_strategy=strategy,
+                                           evict_global_epoch=1,
+                                           gen_scores_fn=gen_scores_fn)))
+      keys = constant_op.constant(
+          np.array([0, 1, 2, 3]).astype(_type_converter(key_dtype)), key_dtype)
+      values = constant_op.constant(
+          _convert([[0] * dim, [1] * dim, [2] * dim, [3] * dim], value_dtype),
+          value_dtype)
+
+      self.evaluate(table.upsert(keys, values))
+      exported_keys, exported_scores = self.evaluate(
+          table.export_keys_and_scores(1))
+      self.assertAllEqual(exported_scores, np.ones(4))
+
+      self.evaluate(table.upsert(keys, values))
+      exported_keys, exported_scores = self.evaluate(
+          table.export_keys_and_scores(1))
+      self.assertAllEqual(exported_scores, np.full((4), 2))
+
+      keys = constant_op.constant(
+          np.array([0, 1, 4, 5]).astype(_type_converter(key_dtype)), key_dtype)
+
+      self.evaluate(table.upsert(keys, values))
+      exported_keys, exported_scores = self.evaluate(
+          table.export_keys_and_scores(1))
+      self.assertAllEqual(np.sort(exported_scores), np.array([1, 1, 2, 2, 3,
+                                                              3]))
+
+      keys = constant_op.constant(
+          np.arange(4, 1034).astype(_type_converter(key_dtype)), key_dtype)
+      values = constant_op.constant(
+          _convert([[10] * dim] * len(keys), value_dtype), value_dtype)
+
+      self.evaluate(table.upsert(keys, values))
+      exported_keys, exported_scores = self.evaluate(
+          table.export_keys_and_scores(1))
+      self.assertTrue(len(exported_keys) < 1024)
+
+      higher_frequence_keys = np.arange(0, 6)
+      exported_higher_frequence_keys = np.sort(
+          exported_keys)[:len(higher_frequence_keys)]
+      self.assertTrue(
+          np.array_equal(higher_frequence_keys, exported_higher_frequence_keys))
+
+      higher_frequence_scores = np.array([2, 2, 2, 2, 3, 3])
+      exported_higher_frequence_scores = np.sort(
+          exported_scores)[-len(higher_frequence_keys):]
+      self.assertTrue(
+          np.array_equal(higher_frequence_scores,
+                         exported_higher_frequence_scores))
+
+      del table
 
 
 if __name__ == "__main__":

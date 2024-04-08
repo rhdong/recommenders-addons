@@ -212,7 +212,7 @@ class HkvHashTable(LookupInterface):
     elif self._evict_strategy == HkvEvictStrategy.LFU or self._evict_strategy == HkvEvictStrategy.EPOCHLFU:
       return tf.ones(keys.shape, keys.dtype)
     else:
-      return self._default_score
+      return self._default_scores
 
   @property
   def name(self):

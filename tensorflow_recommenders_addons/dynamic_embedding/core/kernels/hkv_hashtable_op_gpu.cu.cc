@@ -737,8 +737,8 @@ class HashTableInsertGpuOp : public OpKernel {
     lookup::LookupInterface* table;
     OP_REQUIRES_OK(ctx, GetLookupTable("table_handle", ctx, &table));
     core::ScopedUnref unref_me(table);
-    lookup::HkvHashTableOfTensorsGpu<K, V>* table_hkv =
-        (lookup::HkvHashTableOfTensorsGpu<K, V>*)table;
+    hkv_table::HkvHashTableOfTensorsGpu<K, V>* table_hkv =
+        (hkv_table::HkvHashTableOfTensorsGpu<K, V>*)table;
 
     DataType expected_input_0 = DT_RESOURCE;
     DataTypeVector expected_inputs = {expected_input_0, table->key_dtype(),
@@ -868,8 +868,8 @@ class HashTableExportGpuOp : public OpKernel {
     lookup::LookupInterface* table;
     OP_REQUIRES_OK(ctx, GetLookupTable("table_handle", ctx, &table));
     core::ScopedUnref unref_me(table);
-    lookup::HkvHashTableOfTensorsGpu<K, V>* table_hkv =
-        (lookup::HkvHashTableOfTensorsGpu<K, V>*)table;
+    hkv_table::HkvHashTableOfTensorsGpu<K, V>* table_hkv =
+        (hkv_table::HkvHashTableOfTensorsGpu<K, V>*)table;
 
     OP_REQUIRES_OK(ctx, table_hkv->ExportValues(ctx));
   }
@@ -924,8 +924,8 @@ class HashTableImportGpuOp : public OpKernel {
     lookup::LookupInterface* table;
     OP_REQUIRES_OK(ctx, GetLookupTable("table_handle", ctx, &table));
     core::ScopedUnref unref_me(table);
-    lookup::HkvHashTableOfTensorsGpu<K, V>* table_hkv =
-        (lookup::HkvHashTableOfTensorsGpu<K, V>*)table;
+    hkv_table::HkvHashTableOfTensorsGpu<K, V>* table_hkv =
+        (hkv_table::HkvHashTableOfTensorsGpu<K, V>*)table;
 
     DataType expected_input_0 = DT_RESOURCE;
     DataTypeVector expected_inputs = {expected_input_0, table->key_dtype(),
@@ -1052,78 +1052,79 @@ class HashTableLoadFromFileSystemGpuOp : public OpKernel {
 #define PREFIX_OP_NAME_X(N, ...) PREFIX_OP_NAME_X_IMPL(N, __VA_ARGS__)
 
 // Register the HkvHashTableOfTensors op.
-#define REGISTER_HKV_TABLE(key_dtype, value_dtype)                             \
-  REGISTER_KERNEL_BUILDER(                                                     \
-      Name(PREFIX_OP_NAME(HkvHashTableOfTensors))                              \
-          .Device(DEVICE_GPU)                                                  \
-          .TypeConstraint<key_dtype>("key_dtype")                              \
-          .TypeConstraint<value_dtype>("value_dtype"),                         \
-      HashTableGpuOp<lookup::HkvHashTableOfTensorsGpu<key_dtype, value_dtype>, \
-                     key_dtype, value_dtype>);                                 \
-  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableClear))              \
-                              .Device(DEVICE_GPU)                              \
-                              .TypeConstraint<key_dtype>("key_dtype")          \
-                              .TypeConstraint<value_dtype>("value_dtype"),     \
-                          HashTableClearGpuOp<key_dtype, value_dtype>);        \
-  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableSize))               \
-                              .Device(DEVICE_GPU)                              \
-                              .TypeConstraint<key_dtype>("key_dtype")          \
-                              .TypeConstraint<value_dtype>("value_dtype"),     \
-                          HashTableSizeGpuOp<key_dtype, value_dtype>);         \
-  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableInsert))             \
-                              .Device(DEVICE_GPU)                              \
-                              .TypeConstraint<key_dtype>("key_dtype")          \
-                              .TypeConstraint<value_dtype>("value_dtype"),     \
-                          HashTableInsertGpuOp<key_dtype, value_dtype>);       \
-  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableExport))             \
-                              .Device(DEVICE_GPU)                              \
-                              .TypeConstraint<key_dtype>("key_dtype")          \
-                              .TypeConstraint<value_dtype>("value_dtype"),     \
-                          HashTableExportGpuOp<key_dtype, value_dtype>);       \
-  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableImport))             \
-                              .Device(DEVICE_GPU)                              \
-                              .TypeConstraint<key_dtype>("key_dtype")          \
-                              .TypeConstraint<value_dtype>("value_dtype"),     \
-                          HashTableImportGpuOp<key_dtype, value_dtype>);       \
-  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableAccum))              \
-                              .Device(DEVICE_GPU)                              \
-                              .TypeConstraint<key_dtype>("key_dtype")          \
-                              .TypeConstraint<value_dtype>("value_dtype"),     \
-                          HashTableAccumGpuOp<key_dtype, value_dtype>);        \
-  REGISTER_KERNEL_BUILDER(                                                     \
-      Name(PREFIX_OP_NAME(HkvHashTableExportWithScores))                       \
-          .Device(DEVICE_GPU)                                                  \
-          .TypeConstraint<key_dtype>("key_dtype")                              \
-          .TypeConstraint<value_dtype>("value_dtype"),                         \
-      HashTableExportWithScoresGpuOp<key_dtype, value_dtype>);                 \
-  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableFind))               \
-                              .Device(DEVICE_GPU)                              \
-                              .TypeConstraint<key_dtype>("key_dtype")          \
-                              .TypeConstraint<value_dtype>("value_dtype"),     \
-                          HashTableFindGpuOp<key_dtype, value_dtype>);         \
-  REGISTER_KERNEL_BUILDER(                                                     \
-      Name(PREFIX_OP_NAME(HkvHashTableFindWithExists))                         \
-          .Device(DEVICE_GPU)                                                  \
-          .TypeConstraint<key_dtype>("key_dtype")                              \
-          .TypeConstraint<value_dtype>("value_dtype"),                         \
-      HashTableFindWithExistsGpuOp<key_dtype, value_dtype>);                   \
-  REGISTER_KERNEL_BUILDER(                                                     \
-      Name(PREFIX_OP_NAME(HkvHashTableSaveToFileSystem))                       \
-          .Device(DEVICE_GPU)                                                  \
-          .TypeConstraint<key_dtype>("key_dtype")                              \
-          .TypeConstraint<value_dtype>("value_dtype"),                         \
-      HashTableSaveToFileSystemGpuOp<key_dtype, value_dtype>);                 \
-  REGISTER_KERNEL_BUILDER(                                                     \
-      Name(PREFIX_OP_NAME(HkvHashTableLoadFromFileSystem))                     \
-          .Device(DEVICE_GPU)                                                  \
-          .TypeConstraint<key_dtype>("key_dtype")                              \
-          .TypeConstraint<value_dtype>("value_dtype"),                         \
-      HashTableLoadFromFileSystemGpuOp<key_dtype, value_dtype>);               \
-  REGISTER_KERNEL_BUILDER(                                                     \
-      Name(PREFIX_OP_NAME(HkvHashTableExportKeysAndScores))                    \
-          .Device(DEVICE_GPU)                                                  \
-          .TypeConstraint<key_dtype>("key_dtype")                              \
-          .TypeConstraint<value_dtype>("value_dtype"),                         \
+#define REGISTER_HKV_TABLE(key_dtype, value_dtype)                         \
+  REGISTER_KERNEL_BUILDER(                                                 \
+      Name(PREFIX_OP_NAME(HkvHashTableOfTensors))                          \
+          .Device(DEVICE_GPU)                                              \
+          .TypeConstraint<key_dtype>("key_dtype")                          \
+          .TypeConstraint<value_dtype>("value_dtype"),                     \
+      HashTableGpuOp<                                                      \
+          hkv_table::HkvHashTableOfTensorsGpu<key_dtype, value_dtype>,     \
+          key_dtype, value_dtype>);                                        \
+  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableClear))          \
+                              .Device(DEVICE_GPU)                          \
+                              .TypeConstraint<key_dtype>("key_dtype")      \
+                              .TypeConstraint<value_dtype>("value_dtype"), \
+                          HashTableClearGpuOp<key_dtype, value_dtype>);    \
+  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableSize))           \
+                              .Device(DEVICE_GPU)                          \
+                              .TypeConstraint<key_dtype>("key_dtype")      \
+                              .TypeConstraint<value_dtype>("value_dtype"), \
+                          HashTableSizeGpuOp<key_dtype, value_dtype>);     \
+  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableInsert))         \
+                              .Device(DEVICE_GPU)                          \
+                              .TypeConstraint<key_dtype>("key_dtype")      \
+                              .TypeConstraint<value_dtype>("value_dtype"), \
+                          HashTableInsertGpuOp<key_dtype, value_dtype>);   \
+  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableExport))         \
+                              .Device(DEVICE_GPU)                          \
+                              .TypeConstraint<key_dtype>("key_dtype")      \
+                              .TypeConstraint<value_dtype>("value_dtype"), \
+                          HashTableExportGpuOp<key_dtype, value_dtype>);   \
+  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableImport))         \
+                              .Device(DEVICE_GPU)                          \
+                              .TypeConstraint<key_dtype>("key_dtype")      \
+                              .TypeConstraint<value_dtype>("value_dtype"), \
+                          HashTableImportGpuOp<key_dtype, value_dtype>);   \
+  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableAccum))          \
+                              .Device(DEVICE_GPU)                          \
+                              .TypeConstraint<key_dtype>("key_dtype")      \
+                              .TypeConstraint<value_dtype>("value_dtype"), \
+                          HashTableAccumGpuOp<key_dtype, value_dtype>);    \
+  REGISTER_KERNEL_BUILDER(                                                 \
+      Name(PREFIX_OP_NAME(HkvHashTableExportWithScores))                   \
+          .Device(DEVICE_GPU)                                              \
+          .TypeConstraint<key_dtype>("key_dtype")                          \
+          .TypeConstraint<value_dtype>("value_dtype"),                     \
+      HashTableExportWithScoresGpuOp<key_dtype, value_dtype>);             \
+  REGISTER_KERNEL_BUILDER(Name(PREFIX_OP_NAME(HkvHashTableFind))           \
+                              .Device(DEVICE_GPU)                          \
+                              .TypeConstraint<key_dtype>("key_dtype")      \
+                              .TypeConstraint<value_dtype>("value_dtype"), \
+                          HashTableFindGpuOp<key_dtype, value_dtype>);     \
+  REGISTER_KERNEL_BUILDER(                                                 \
+      Name(PREFIX_OP_NAME(HkvHashTableFindWithExists))                     \
+          .Device(DEVICE_GPU)                                              \
+          .TypeConstraint<key_dtype>("key_dtype")                          \
+          .TypeConstraint<value_dtype>("value_dtype"),                     \
+      HashTableFindWithExistsGpuOp<key_dtype, value_dtype>);               \
+  REGISTER_KERNEL_BUILDER(                                                 \
+      Name(PREFIX_OP_NAME(HkvHashTableSaveToFileSystem))                   \
+          .Device(DEVICE_GPU)                                              \
+          .TypeConstraint<key_dtype>("key_dtype")                          \
+          .TypeConstraint<value_dtype>("value_dtype"),                     \
+      HashTableSaveToFileSystemGpuOp<key_dtype, value_dtype>);             \
+  REGISTER_KERNEL_BUILDER(                                                 \
+      Name(PREFIX_OP_NAME(HkvHashTableLoadFromFileSystem))                 \
+          .Device(DEVICE_GPU)                                              \
+          .TypeConstraint<key_dtype>("key_dtype")                          \
+          .TypeConstraint<value_dtype>("value_dtype"),                     \
+      HashTableLoadFromFileSystemGpuOp<key_dtype, value_dtype>);           \
+  REGISTER_KERNEL_BUILDER(                                                 \
+      Name(PREFIX_OP_NAME(HkvHashTableExportKeysAndScores))                \
+          .Device(DEVICE_GPU)                                              \
+          .TypeConstraint<key_dtype>("key_dtype")                          \
+          .TypeConstraint<value_dtype>("value_dtype"),                     \
       HashTableExportKeysAndScoresGpuOp<key_dtype, value_dtype>);
 
 REGISTER_HKV_TABLE(int64, float);
