@@ -154,7 +154,7 @@ class HkvHashTableConfig(object):
       max_capacity=KHkvHashTableMaxCapacity,
       max_hbm_for_values=KHkvHashTableMaxHbmForValuesByBytes,
       evict_strategy=HkvEvictStrategy.LRU,
-      evict_global_epoch=0,
+      step_per_epoch=0,
       gen_scores_fn=None,
   ):
     """ CuckooHashTableConfig include nothing for parameter default satisfied.
@@ -163,7 +163,7 @@ class HkvHashTableConfig(object):
     self.max_capacity = max_capacity
     self.max_hbm_for_values = max_hbm_for_values
     self.evict_strategy = evict_strategy
-    self.evict_global_epoch = evict_global_epoch
+    self.step_per_epoch = step_per_epoch
     self.gen_scores_fn = gen_scores_fn
 
 
@@ -190,14 +190,14 @@ class HkvHashTableCreator(KVCreator):
     self.max_capacity = KHkvHashTableMaxCapacity
     self.max_hbm_for_values = KHkvHashTableMaxHbmForValuesByBytes
     self.evict_strategy = HkvEvictStrategy.LRU
-    self.evict_global_epoch = 0
+    self.step_per_epoch = 0
     self.gen_scores_fn = None
     if self.config and isinstance(self.config, de.HkvHashTableConfig):
       self.init_capacity = self.config.init_capacity
       self.max_capacity = self.config.max_capacity
       self.max_hbm_for_values = self.config.max_hbm_for_values
       self.evict_strategy = self.config.evict_strategy
-      self.evict_global_epoch = self.config.evict_global_epoch
+      self.step_per_epoch = self.config.step_per_epoch
       self.gen_scores_fn = self.config.gen_scores_fn
     self.device = device
     self.shard_saveable_object_fn = shard_saveable_object_fn
@@ -212,7 +212,7 @@ class HkvHashTableCreator(KVCreator):
         max_capacity=self.max_capacity,
         max_hbm_for_values=self.max_hbm_for_values,
         evict_strategy=self.evict_strategy,
-        evict_global_epoch=self.evict_global_epoch,
+        step_per_epoch=self.step_per_epoch,
         gen_scores_fn=self.gen_scores_fn,
         config=self.config,
         device=self.device,

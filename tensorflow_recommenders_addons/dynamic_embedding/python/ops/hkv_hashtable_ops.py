@@ -77,7 +77,7 @@ class HkvHashTable(LookupInterface):
       device='',
       shard_saveable_object_fn=None,
       evict_strategy=HkvEvictStrategy.LRU,
-      evict_global_epoch=0,
+      step_per_epoch=0,
       gen_scores_fn=None,
   ):
     """Creates an empty `HkvHashTable` object.
@@ -121,7 +121,7 @@ class HkvHashTable(LookupInterface):
       self._device = ['/GPU:0']
     self._new_obj_trackable = None
     self._evict_strategy = evict_strategy
-    self._evict_global_epoch = evict_global_epoch
+    self._step_per_epoch = step_per_epoch
     self._gen_scores_fn = gen_scores_fn
     self._default_scores = tf.constant([], dtypes.int64)
 
@@ -130,7 +130,7 @@ class HkvHashTable(LookupInterface):
       self._max_capacity = self._config.max_capacity
       self._max_hbm_for_values = self._config.max_hbm_for_values
       self._evict_strategy = self._config.evict_strategy
-      self._evict_global_epoch = self._config.evict_global_epoch
+      self._step_per_epoch = self._config.step_per_epoch
       self._gen_scores_fn = self._config.gen_scores_fn
 
     self._shared_name = None
@@ -181,7 +181,7 @@ class HkvHashTable(LookupInterface):
           max_capacity=self._max_capacity,
           max_hbm_for_vectors=self._max_hbm_for_values,
           strategy=self._evict_strategy.value,
-          evict_global_epoch=self._evict_global_epoch,
+          step_per_epoch=self._step_per_epoch,
           name=self._name,
       )
 

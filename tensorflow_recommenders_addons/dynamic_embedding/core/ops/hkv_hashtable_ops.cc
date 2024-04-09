@@ -306,7 +306,7 @@ REGISTER_OP(PREFIX_OP_NAME(HkvHashTableOfTensors))
     .Attr("init_capacity: int = 0")
     .Attr("max_capacity: int = 0")
     .Attr("max_hbm_for_vectors: int = 0")
-    .Attr("evict_global_epoch: int = 0")
+    .Attr("step_per_epoch: int = 0")
     .Attr("strategy: int = 0")
     .SetIsStateful()
     .SetShapeFn([](InferenceContext* c) {

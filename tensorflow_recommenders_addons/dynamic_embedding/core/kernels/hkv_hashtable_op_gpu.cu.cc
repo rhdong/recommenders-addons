@@ -75,8 +75,8 @@ class HkvHashTableOfTensorsGpu final : public LookupInterface {
     int64 init_capacity_i64 = 0;
     int64 max_capacity_i64 = 0;
     int64 max_hbm_for_vectors_i64 = 0;
-    int64 evict_global_epoch = 0;
     int strategy = 0;
+    int64 step_per_epoch = 0;
     OP_REQUIRES_OK(
         ctx, GetNodeAttr(kernel->def(), "init_capacity", &init_capacity_i64));
     OP_REQUIRES_OK(
@@ -88,17 +88,16 @@ class HkvHashTableOfTensorsGpu final : public LookupInterface {
         ctx, (max_hbm_for_vectors_i64 >= 0),
         errors::InvalidArgument("params max_hbm_for_vectors less than 0"));
 
-    OP_REQUIRES_OK(ctx, GetNodeAttr(kernel->def(), "evict_global_epoch",
-                                    &evict_global_epoch));
-
-    OP_REQUIRES(
-        ctx, (evict_global_epoch >= 0),
-        errors::InvalidArgument("params evict_global_epoch less than 0"));
+    if (HkvEvictStrategy::kEpochLru == strategy ||
+        HkvEvictStrategy::kEpochLfu == strategy) {
+      OP_REQUIRES_OK(
+          ctx, GetNodeAttr(kernel->def(), "step_per_epoch", &step_per_epoch));
+    }
 
     options.init_capacity = static_cast<size_t>(init_capacity_i64);
     options.max_capacity = static_cast<size_t>(max_capacity_i64);
     options.max_hbm_for_vectors = static_cast<size_t>(max_hbm_for_vectors_i64);
-    options.evict_global_epoch = static_cast<size_t>(evict_global_epoch);
+    options.step_per_epoch = step_per_epoch;
 
     if (options.max_capacity == 0) {
       char* env_max_capacity_str =
