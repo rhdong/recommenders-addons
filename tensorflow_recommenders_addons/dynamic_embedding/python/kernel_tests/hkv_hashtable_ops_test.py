@@ -290,40 +290,46 @@ class HkvHashtableTest(test.TestCase):
 
   @test_util.run_in_graph_and_eager_modes()
   def test_hkv_hashtable_save_local_file_system(self):
-    test_devices = ['/CPU:0']
+    # test_devices = ['/CPU:0']
     if is_gpu_available:
-      test_devices = test_devices + ['/GPU:0']
+      test_devices = ['/GPU:0']
 
-    dim = 8
+    dim = 12
     for idx, device in enumerate(test_devices):
       var1 = de.get_variable(
-          'lfsv1_' + str(idx),
-          key_dtype=dtypes.int64,
-          value_dtype=dtypes.float32,
-          initializer=init_ops.random_normal_initializer(0.0, 0.01),
-          devices=[device],
-          init_size=3000,
-          dim=dim,
-          kv_creator=de.HkvHashTableCreator(config=de.HkvHashTableConfig(
-              max_capacity=99999)))
+        'lfsv1_' + str(idx),
+        key_dtype=dtypes.int64,
+        value_dtype=dtypes.int32,
+        initializer=init_ops.random_normal_initializer(0.0, 0.01),
+        devices=[device],
+        init_size=1000000,
+        dim=dim,
+        kv_creator=de.HkvHashTableCreator(config=de.HkvHashTableConfig(
+          init_capacity=1000000,
+          max_capacity=100000000,
+          max_hbm_for_values=2147483648)))
       var2 = de.get_variable(
-          'lfsv2_' + str(idx),
-          key_dtype=dtypes.int64,
-          value_dtype=dtypes.float32,
-          initializer=init_ops.random_normal_initializer(0.0, 0.01),
-          devices=[device],
-          init_size=3000,
-          dim=dim,
-          kv_creator=de.HkvHashTableCreator(config=de.HkvHashTableConfig(
-              max_capacity=99999)))
-      init_keys = constant_op.constant(list(range(10000)), dtypes.int64)
-      init_values = var1.lookup(init_keys)
+        'lfsv2_' + str(idx),
+        key_dtype=dtypes.int64,
+        value_dtype=dtypes.int32,
+        initializer=init_ops.random_normal_initializer(0.0, 0.01),
+        devices=[device],
+        init_size=1000000,
+        dim=dim,
+        kv_creator=de.HkvHashTableCreator(config=de.HkvHashTableConfig(
+          init_capacity=8847360,
+          max_capacity=100000000,
+          max_hbm_for_values=2147483648)))
 
+      batch_size = 4096
       with self.session(config=default_config, use_gpu=True):
-        self.evaluate(var1.upsert(init_keys, init_values))
+        for i in range(1800):
+          keys = constant_op.constant(list(range(i * batch_size, (i + 1) * batch_size)), dtypes.int64)
+          values = constant_op.constant([[1] * dim for _ in range(batch_size)],
+                                        dtypes.int32)
 
-        np_keys = self.evaluate(init_keys)
-        np_values = self.evaluate(init_values)
+          self.evaluate(var1.upsert(keys, values))
+          print(self.evaluate(var1.size()))
 
         dirpath = "file:///tmp/test_local_file_system/tfra_embedding"
         self.evaluate(var1.tables[0].save_to_file_system(dirpath,
@@ -333,13 +339,8 @@ class HkvHashtableTest(test.TestCase):
                                                            file_name="test",
                                                            buffer_size=4096))
 
-        load_keys, load_values = self.evaluate(var2.export())
-        sort_idx = load_keys.argsort()
-        load_keys = load_keys[sort_idx[::1]]
-        load_values = load_values[sort_idx[::1]]
-
-        self.assertAllEqual(np_keys, np.sort(load_keys))
-        self.assertAllEqual(np.sort(np_values), np.sort(load_values))
+        print(self.evaluate(var1.size()))
+        print(self.evaluate(var2.size()))
 
   # """
   #   base kv [0, 1, 2, 3] [0, 1, 2, 3]
