@@ -317,7 +317,7 @@ class HkvHashtableTest(test.TestCase):
         init_size=1000000,
         dim=dim,
         kv_creator=de.HkvHashTableCreator(config=de.HkvHashTableConfig(
-          init_capacity=8847360,
+          init_capacity=1000000,
           max_capacity=100000000,
           max_hbm_for_values=2147483648)))
 
