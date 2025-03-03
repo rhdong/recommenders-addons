@@ -2,13 +2,14 @@ import os
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
-from absl import flags
-from absl import app
 from tensorflow_recommenders_addons import dynamic_embedding as de
+
 try:
   from tensorflow.keras.optimizers.legacy import Adam
 except:
   from tensorflow.keras.optimizers import Adam
+
+from tensorflow import distribute as tf_dist
 
 flags = tf.compat.v1.app.flags
 FLAGS = flags.FLAGS
@@ -33,6 +34,18 @@ input_spec = {
         None,
     ], dtype=tf.int64, name='movie_id')
 }
+
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+  try:
+    # Currently, memory growth needs to be the same across GPUs
+    for gpu in gpus:
+      tf.config.experimental.set_memory_growth(gpu, True)
+    logical_gpus = tf.config.list_logical_devices('GPU')
+    print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+  except RuntimeError as e:
+    # Memory growth must be set before GPUs have been initialized
+    print(e)
 
 
 class DualChannelsDeepModel(tf.keras.Model):
@@ -59,11 +72,13 @@ class DualChannelsDeepModel(tf.keras.Model):
         user_embedding_size,
         initializer=embedding_initializer,
         devices=self.devices,
+        with_unique=False,
         name='user_embedding')
     self.movie_embedding = de.keras.layers.SquashedEmbedding(
         movie_embedding_size,
         initializer=embedding_initializer,
         devices=self.devices,
+        with_unique=False,
         name='movie_embedding')
 
     self.dnn1 = tf.keras.layers.Dense(
@@ -94,7 +109,6 @@ class DualChannelsDeepModel(tf.keras.Model):
     user_latent = self.user_embedding(user_id)
     movie_latent = self.movie_embedding(movie_id)
     latent = tf.concat([user_latent, movie_latent], axis=1)
-
     x = self.dnn1(latent)
     x = self.dnn2(x)
     x = self.dnn3(x)
@@ -208,6 +222,7 @@ class Runner():
 
     dataset = self.get_dataset(batch_size=self.test_bs)
     dataset = self.strategy.experimental_distribute_dataset(dataset)
+
     with self.strategy.scope():
       model = tf.keras.models.load_model(self.export_dir)
     signature = model.signatures['serving_default']
@@ -237,13 +252,12 @@ def start_chief(config):
   cluster_spec = tf.train.ClusterSpec(config["cluster"])
   cluster_resolver = tf.distribute.cluster_resolver.SimpleClusterResolver(
       cluster_spec, task_type="chief", task_id=0)
-  strategy = tf.distribute.experimental.ParameterServerStrategy(
-      cluster_resolver)
+  strategy = tf_dist.experimental.ParameterServerStrategy(cluster_resolver)
   runner = Runner(strategy=strategy,
                   train_bs=64,
                   test_bs=1,
-                  epochs=2,
-                  steps_per_epoch=10,
+                  epochs=1,
+                  steps_per_epoch=1000,
                   model_dir=None,
                   export_dir=None)
   runner.train()

@@ -23,6 +23,10 @@ from tensorflow_recommenders_addons import dynamic_embedding as de
 
 from tensorflow import version as tf_version
 from tensorflow.python.distribute import central_storage_strategy
+
+from tensorflow_recommenders_addons.dynamic_embedding.python.train.utils import worker_devices, \
+  is_parameter_server_strategy
+
 if version.parse(tf_version.VERSION) >= version.parse("2.14"):
   from tensorflow.python.distribute import distribute_lib as distribute_ctx
 else:
@@ -912,8 +916,11 @@ def create_slots(variable, init, slot_name, op_name, bp_v2):
     # for forward compatibility.
     slot_tw_name = slot_name
 
-  def slot_trainable_create_(var_impl, scope_store_params, full_name_in,
-                             slot_tw_name_in):
+  def slot_trainable_create_(var_impl,
+                             scope_store_params,
+                             full_name_in,
+                             slot_tw_name_in,
+                             distribute_strategy=None):
     if isinstance(var_impl, de.shadow_ops.ShadowVariable):
       slot_trainable = de.shadow_ops.ShadowVariable(
           params=scope_store_params,
@@ -921,7 +928,7 @@ def create_slots(variable, init, slot_name, op_name, bp_v2):
           exists=var_impl.exists,
           name=full_name_in,
           trainable=False,
-      )
+          distribute_strategy=distribute_strategy)
     else:
       _, slot_trainable = de.embedding_lookup(
           params=scope_store_params,
@@ -951,8 +958,17 @@ def create_slots(variable, init, slot_name, op_name, bp_v2):
         VariableAggregation.NONE,
         TrainableWrapperDistributedPolicy(VariableAggregation.NONE))
   else:
-    slot_trainable = slot_trainable_create_(variable,
-                                            scope_store._vars[full_name],
-                                            full_name, slot_tw_name)
+    if hasattr(
+        variable, 'distribute_strategy'
+    ) and variable.distribute_strategy and is_parameter_server_strategy(
+        variable.distribute_strategy):
+      slot_trainable = slot_trainable_create_(variable,
+                                              scope_store._vars[full_name],
+                                              full_name, slot_tw_name,
+                                              variable.distribute_strategy)
+    else:
+      slot_trainable = slot_trainable_create_(variable,
+                                              scope_store._vars[full_name],
+                                              full_name, slot_tw_name)
 
   return slot_trainable
