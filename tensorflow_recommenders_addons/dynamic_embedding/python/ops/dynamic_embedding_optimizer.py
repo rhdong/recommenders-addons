@@ -16,6 +16,8 @@
 """patch on optimizers"""
 
 import functools
+
+import tensorflow as tf
 from packaging import version
 import six
 
@@ -184,6 +186,9 @@ def DynamicEmbeddingOptimizer(self, bp_v2=False, synchronous=False, **kwargs):
                   "Cannot use a constraint function on a sparse variable.")
             if "apply_state" in self._sparse_apply_args:
               apply_kwargs["apply_state"] = apply_state
+            # printop = tf.print("ids_8d:", output_stream=tf.compat.v1.logging.error)
+            # with tf.control_dependencies([printop]):
+            #   pass
             with ops.control_dependencies(_before):
               _apply_op = self._resource_apply_sparse_duplicate_indices(
                   grad.values, var, grad.indices, **apply_kwargs)

@@ -37,7 +37,7 @@ from packaging import version
 
 import tensorflow as tf
 
-from tensorflow.python.distribute import distribute_lib
+from tensorflow.python.distribute import distribute_lib, ps_values
 from tensorflow.python.eager import context
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
@@ -49,6 +49,10 @@ from tensorflow.python.ops import resource_variable_ops
 from tensorflow_recommenders_addons import dynamic_embedding as de
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.embedding_weights import EmbeddingWeights, \
   TrainableWrapper
+from tensorflow_recommenders_addons.dynamic_embedding.python.ops.parameter_server import create_per_worker_de_variable, \
+  DEPerWorkerVariable
+from tensorflow_recommenders_addons.dynamic_embedding.python.train.utils import is_parameter_server_strategy
+from tensorflow.python.ops import variables
 
 if version.parse(tf.__version__) >= version.parse("2.10"):
   from tensorflow.python.trackable import base as trackable
@@ -114,7 +118,6 @@ class ShadowVariable(EmbeddingWeights, TrainableWrapper):
     ids_name = self._name + '-ids'
     if ids is None:
       self.ids = get_de_resource_variable(
-          trainable=False,
           collections=collections,
           name=ids_name,
           dtype=self.params.key_dtype,
@@ -122,7 +125,11 @@ class ShadowVariable(EmbeddingWeights, TrainableWrapper):
           shape=tensor_shape.TensorShape(None))
     else:
       if not isinstance(ids, resource_variable_ops.ResourceVariable):
-        raise TypeError('If ids is set, it needs to be a ResourceVariable')
+        tfprint = tf.print("ids_8c:", ids, type(ids), ids.__class__.__name__, output_stream=tf.compat.v1.logging.error)
+        with tf.control_dependencies([tfprint]):
+          pass
+      #     not isinstance(ids, variables.Variable)):
+      #   raise TypeError('If ids is set, it needs to be a ResourceVariable or ps_values.PerWorkerVariable')
       self.ids = ids
 
     model_mode = kwargs.get('model_mode', None)
@@ -152,7 +159,6 @@ class ShadowVariable(EmbeddingWeights, TrainableWrapper):
     exists_name = self._name + '-exists'
     if exists is None:
       self.exists = get_de_resource_variable(
-          trainable=False,
           collections=collections,
           name=exists_name,
           dtype=dtypes.bool,
@@ -272,10 +278,14 @@ def embedding_lookup(
   with ops.name_scope(name, "shadow_embedding_lookup"):
     with ops.colocate_with(None, ignore_existing=True):
       if de.ModelMode.CURRENT_SETTING == de.ModelMode.TRAIN:
+        tfprint = tf.print("ids_8b:", shadow_.ids, ids, output_stream=tf.compat.v1.logging.error)
+        with tf.control_dependencies([tfprint]):
+          pass
         with ops.control_dependencies([shadow_._reset_ids(ids)]):
           result = shadow_.read_value(do_prefetch=True)
       else:
         result = shadow_.params.lookup(ids)
+
       return result
 
 
@@ -360,14 +370,17 @@ class DEResourceVariable(resource_variable_ops.ResourceVariable):
     super(DEResourceVariable, self).__init__(*args, **kwargs)
 
 
-def get_de_resource_variable(trainable,
+def get_de_resource_variable(
                              collections,
                              name,
                              dtype,
                              distribute_strategy,
                              shape=tensor_shape.TensorShape(None)):
-  return DEResourceVariable((),
-                            trainable=trainable,
+  if is_parameter_server_strategy(distribute_strategy):
+    return create_per_worker_de_variable(distribute_strategy, name, dtype, shape)
+  else:
+    return DEResourceVariable((),
+                            trainable=False,
                             collections=collections,
                             name=name,
                             dtype=dtype,
@@ -377,7 +390,7 @@ def get_de_resource_variable(trainable,
 
 def is_de_resource_variable(var):
   return isinstance(var, DEResourceVariable) or isinstance(
-      var, TrainableWrapper)
+      var, TrainableWrapper) or isinstance(var, DEPerWorkerVariable)
 
 
 class HvdVariable(EmbeddingWeights):
