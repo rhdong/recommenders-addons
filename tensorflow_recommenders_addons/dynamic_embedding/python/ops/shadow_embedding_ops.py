@@ -272,6 +272,9 @@ def embedding_lookup(
   with ops.name_scope(name, "shadow_embedding_lookup"):
     with ops.colocate_with(None, ignore_existing=True):
       if de.ModelMode.CURRENT_SETTING == de.ModelMode.TRAIN:
+        tfprint = tf.print("ids_2b:", shadow_.ids, ids, output_stream=tf.compat.v1.logging.error)
+        with tf.control_dependencies([tfprint]):
+          pass
         with ops.control_dependencies([shadow_._reset_ids(ids)]):
           result = shadow_.read_value(do_prefetch=True)
       else:

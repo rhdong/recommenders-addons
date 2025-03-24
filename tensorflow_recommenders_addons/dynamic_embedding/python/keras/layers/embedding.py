@@ -303,6 +303,9 @@ class Embedding(Layer):
     Returns:
       A embedding output with shape (shape(ids), embedding_size).
     """
+    tfprint = tf.print("ids_2a:", ids, output_stream=tf.compat.v1.logging.error)
+    with tf.control_dependencies([tfprint]):
+      pass
     return de.shadow_ops.embedding_lookup_unique(self.shadow, ids,
                                                  self.embedding_size,
                                                  self.with_unique, self.name)
