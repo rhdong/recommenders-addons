@@ -72,13 +72,13 @@ class DualChannelsDeepModel(tf.keras.Model):
         user_embedding_size,
         initializer=embedding_initializer,
         devices=self.devices,
-        # with_unique=False,
+        with_unique=False,
         name='user_embedding')
     self.movie_embedding = de.keras.layers.SquashedEmbedding(
         movie_embedding_size,
         initializer=embedding_initializer,
         devices=self.devices,
-        # with_unique=False,
+        with_unique=False,
         name='movie_embedding')
 
     self.dnn1 = tf.keras.layers.Dense(
@@ -105,11 +105,10 @@ class DualChannelsDeepModel(tf.keras.Model):
   @tf.function
   def call(self, features):
     user_id = tf.reshape(features['user_id'], (-1, 1))
-    # movie_id = tf.reshape(features['movie_id'], (-1, 1))
+    movie_id = tf.reshape(features['movie_id'], (-1, 1))
     user_latent = self.user_embedding(user_id)
-    # movie_latent = self.movie_embedding(movie_id)
-    # latent = tf.concat([user_latent, movie_latent], axis=1)
-    latent = user_latent
+    movie_latent = self.movie_embedding(movie_id)
+    latent = tf.concat([user_latent, movie_latent], axis=1)
     x = self.dnn1(latent)
     x = self.dnn2(x)
     x = self.dnn3(x)
@@ -130,7 +129,7 @@ class Runner():
         "/job:ps/replica:0/task:{}/device:CPU:0".format(idx)
         for idx in range(self.num_ps)
     ]
-    self.embedding_size = 4
+    self.embedding_size = 32
     self.train_bs = train_bs
     self.test_bs = test_bs
     self.epochs = epochs
@@ -255,10 +254,10 @@ def start_chief(config):
       cluster_spec, task_type="chief", task_id=0)
   strategy = tf_dist.experimental.ParameterServerStrategy(cluster_resolver)
   runner = Runner(strategy=strategy,
-                  train_bs=4,
+                  train_bs=64,
                   test_bs=1,
                   epochs=1,
-                  steps_per_epoch=6,
+                  steps_per_epoch=1000,
                   model_dir=None,
                   export_dir=None)
   runner.train()
