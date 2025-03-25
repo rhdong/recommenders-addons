@@ -1469,30 +1469,17 @@ def embedding_lookup(
           with ops.init_scope():
             shadow = params._trainable_store.get(trainable_name, None)
             if shadow is None:
-              distribute_strategy = distribute_ctx.get_strategy(
-              ) if distribute_ctx.has_strategy else None
-              if is_parameter_server_strategy(distribute_strategy):
-                shadow = de.shadow_ops.ShadowVariable(
-                    params,
-                    name=trainable_name,
-                    max_norm=max_norm,
-                    trainable=params.trainable,
-                    distribute_strategy=distribute_strategy,
-                    model_mode=de.ModelMode.CURRENT_SETTING)
-              else:
-                shadow = de.shadow_ops.ShadowVariable(
-                    params,
-                    name=trainable_name,
-                    max_norm=max_norm,
-                    trainable=params.trainable,
-                    model_mode=de.ModelMode.CURRENT_SETTING)
+              shadow = de.shadow_ops.ShadowVariable(
+                  params,
+                  name=trainable_name,
+                  max_norm=max_norm,
+                  trainable=params.trainable,
+                  model_mode=de.ModelMode.CURRENT_SETTING)
               params._trainable_store[trainable_name] = shadow
           return shadow
 
       with ops.colocate_with(ids, ignore_existing=True):
-        from tensorflow_recommenders_addons.dynamic_embedding.python.train.utils import is_parameter_server_strategy
-        if distribute_ctx.has_strategy() and not is_parameter_server_strategy(
-            distribute_ctx.get_strategy()):
+        if distribute_ctx.has_strategy():
           trainable_ = params._distribute_trainable_store.get(name, None)
           if trainable_ is None:
             strategy_devices = distribute_ctx.get_strategy(

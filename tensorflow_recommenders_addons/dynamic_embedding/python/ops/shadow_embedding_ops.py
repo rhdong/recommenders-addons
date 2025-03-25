@@ -113,13 +113,13 @@ class ShadowVariable(EmbeddingWeights, TrainableWrapper):
       kwargs.pop('ids')
     ids_name = self._name + '-ids'
     if ids is None:
-      self.ids = get_de_resource_variable(
-          trainable=False,
-          collections=collections,
-          name=ids_name,
-          dtype=self.params.key_dtype,
-          distribute_strategy=distribute_strategy,
-          shape=tensor_shape.TensorShape(None))
+      self.ids = DEResourceVariable((),
+                                    trainable=False,
+                                    collections=collections,
+                                    name=ids_name,
+                                    dtype=self.params.key_dtype,
+                                    distribute_strategy=distribute_strategy,
+                                    shape=tensor_shape.TensorShape(None))
     else:
       if not isinstance(ids, resource_variable_ops.ResourceVariable):
         raise TypeError('If ids is set, it needs to be a ResourceVariable')
@@ -151,13 +151,13 @@ class ShadowVariable(EmbeddingWeights, TrainableWrapper):
     exists = kwargs.get('exists', None)
     exists_name = self._name + '-exists'
     if exists is None:
-      self.exists = get_de_resource_variable(
-          trainable=False,
-          collections=collections,
-          name=exists_name,
-          dtype=dtypes.bool,
-          distribute_strategy=distribute_strategy,
-          shape=tensor_shape.TensorShape(None))
+      self.exists = DEResourceVariable((),
+                                       trainable=False,
+                                       collections=collections,
+                                       name=exists_name,
+                                       dtype=dtypes.bool,
+                                       distribute_strategy=distribute_strategy,
+                                       shape=tensor_shape.TensorShape(None))
       self._track_trackable(self.exists, exists_name, overwrite=False)
     else:
       self.exists = exists
@@ -261,6 +261,7 @@ def embedding_lookup(
       containing the values from the params tensor(s) for keys in ids.
   """
   ids = ops.convert_to_tensor(ids)
+
   if distribute_utils.is_distributed_variable(shadow):
     shadow_ = shadow._get_on_device_or_primary()
   else:
@@ -276,6 +277,7 @@ def embedding_lookup(
           result = shadow_.read_value(do_prefetch=True)
       else:
         result = shadow_.params.lookup(ids)
+
       return result
 
 
@@ -358,26 +360,6 @@ class DEResourceVariable(resource_variable_ops.ResourceVariable):
 
   def __init__(self, *args, **kwargs):
     super(DEResourceVariable, self).__init__(*args, **kwargs)
-
-
-def get_de_resource_variable(trainable,
-                             collections,
-                             name,
-                             dtype,
-                             distribute_strategy,
-                             shape=tensor_shape.TensorShape(None)):
-  return DEResourceVariable((),
-                            trainable=trainable,
-                            collections=collections,
-                            name=name,
-                            dtype=dtype,
-                            distribute_strategy=distribute_strategy,
-                            shape=shape)
-
-
-def is_de_resource_variable(var):
-  return isinstance(var, DEResourceVariable) or isinstance(
-      var, TrainableWrapper)
 
 
 class HvdVariable(EmbeddingWeights):

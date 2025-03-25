@@ -16,6 +16,7 @@
 """patch on tensorflow"""
 
 import inspect
+import functools
 import os.path
 from packaging import version
 import re
@@ -31,6 +32,7 @@ from tensorflow.python.eager import context
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import errors
 from tensorflow.python.framework import ops
+from tensorflow.python.keras.saving.saved_model import save as tf_saved_model_save
 from tensorflow.python.keras.utils import tf_utils
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import control_flow_ops
@@ -40,7 +42,6 @@ from tensorflow.python.platform import gfile
 from tensorflow.python.platform import tf_logging
 from tensorflow.python.training import saver
 from tensorflow.python.training import training_util
-
 if version.parse(tf_version.VERSION) >= version.parse("2.10"):
   from tensorflow.python.checkpoint import checkpoint_management
   from tensorflow.python.checkpoint import checkpoint_options
@@ -293,17 +294,18 @@ class _DynamicEmbeddingSaver(saver.Saver):
     return control_flow_ops.group(restore_ops.as_list())
 
   def _build(self, checkpoint_path, build_save, build_restore):
-    # TrainableWrapper DEResourceVariable should not be save or restore parameter.
-    from tensorflow_recommenders_addons.dynamic_embedding.python.ops.shadow_embedding_ops import is_de_resource_variable
-
+    # TrainableWrapper and DEResourceVariable should not be save or restore parameter.
+    from tensorflow_recommenders_addons.dynamic_embedding.python.ops.shadow_embedding_ops import DEResourceVariable
+    filter_lambda = lambda x: (isinstance(x, de.TrainableWrapper)) or (
+        isinstance(x, DEResourceVariable))
     if isinstance(self._var_list, dict):
       for key, value in self._var_list.items():
-        if is_de_resource_variable(value):
+        if filter_lambda(value):
           self._var_list.pop(key)
     elif isinstance(self._var_list, list):
       _tmp_var_list = []
       for value in self._var_list:
-        if not is_de_resource_variable(value):
+        if not filter_lambda(value):
           _tmp_var_list.append(value)
       self._var_list = _tmp_var_list
 
