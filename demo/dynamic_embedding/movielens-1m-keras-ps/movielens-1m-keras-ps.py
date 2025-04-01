@@ -6,8 +6,10 @@ from tensorflow_recommenders_addons import dynamic_embedding as de
 
 try:
   from tensorflow.keras.optimizers.legacy import Adam
+  from tensorflow.keras.optimizers.legacy import Adagrad
 except:
   from tensorflow.keras.optimizers import Adam
+  from tensorflow.keras.optimizers import Adagrad
 
 from tensorflow import distribute as tf_dist
 
@@ -130,7 +132,7 @@ class Runner():
         "/job:ps/replica:0/task:{}/device:CPU:0".format(idx)
         for idx in range(self.num_ps)
     ]
-    self.embedding_size = 4
+    self.embedding_size = 1
     self.train_bs = train_bs
     self.test_bs = test_bs
     self.epochs = epochs
@@ -148,7 +150,7 @@ class Runner():
     ratings = dataset.map(
         lambda x: tf.one_hot(tf.cast(x['user_rating'] - 1, dtype=tf.int64), 5))
     dataset = dataset.zip((features, ratings))
-    dataset = dataset.shuffle(4096, reshuffle_each_iteration=False)
+    dataset = dataset.shuffle(4096, reshuffle_each_iteration=False).repeat()
     if batch_size > 1:
       dataset = dataset.batch(batch_size)
     return dataset
@@ -161,6 +163,8 @@ class Runner():
           self.ps_devices, self.embedding_size, self.embedding_size,
           tf.keras.initializers.RandomNormal(0.0, 0.5))
       optimizer = Adam(1E-3)
+
+      # optimizer = Adagrad(1E-3)
       optimizer = de.DynamicEmbeddingOptimizer(optimizer)
 
       auc = tf.keras.metrics.AUC(num_thresholds=1000)
@@ -176,7 +180,7 @@ class Runner():
         model.load_weights(self.model_dir)
 
     model.fit(dataset, epochs=self.epochs, steps_per_epoch=self.steps_per_epoch)
-
+    print(f"model: {model.trainable_variables}")
     if self.model_dir:
       save_options = tf.saved_model.SaveOptions(namespace_whitelist=['TFRA'])
       model.save(self.model_dir, options=save_options)
@@ -255,10 +259,10 @@ def start_chief(config):
       cluster_spec, task_type="chief", task_id=0)
   strategy = tf_dist.experimental.ParameterServerStrategy(cluster_resolver)
   runner = Runner(strategy=strategy,
-                  train_bs=4,
+                  train_bs=2,
                   test_bs=1,
                   epochs=1,
-                  steps_per_epoch=4,
+                  steps_per_epoch=2,
                   model_dir=None,
                   export_dir=None)
   runner.train()

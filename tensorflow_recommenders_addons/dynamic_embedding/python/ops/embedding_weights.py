@@ -41,7 +41,8 @@ except:
 from tensorflow.python.util import compat, dispatch
 
 try:  # tf version >= 2.14.0
-  from tensorflow.python.distribute import distribute_lib as distribute_ctx
+  from tensorflow.python.distribute import distribute_lib as distribute_ctx, ps_values
+
   assert hasattr(distribute_ctx, 'has_strategy')
 except:
   from tensorflow.python.distribute import distribution_strategy_context as distribute_ctx
@@ -119,8 +120,45 @@ class ModelMode(object):
   # The default setting is training mode.
   CURRENT_SETTING = TRAIN
 
+class TrainablePerWorker(ps_values.PerWorkerVariable):
+  def __init__(self, strategy, next_creator, **kwargs):
+    super(TrainablePerWorker,
+          self).__init__(strategy, next_creator, **kwargs)
+    self._trainable = kwargs.get("trainable", True)
+  def read_value(self):
+    tfprint = tf.print("TrainablePerWorker read_value:", self._coordinator_instance.device)
+    with tf.control_dependencies([tfprint]):
+      pass
+    with tf.GradientTape() as tape:
+      self._maybe_create_per_worker_vars()
+      value = super(ps_values.PerWorkerVariable).read_value()
+      tape.watch(value)
+    return value
+  def value(self):
+    tfprint = tf.print("TrainablePerWorker value:", self._coordinator_instance.device)
+    with tf.control_dependencies([tfprint]):
+      pass
+    with tf.GradientTape() as tape:
+      self._maybe_create_per_worker_vars()
+      value = super(ps_values.PerWorkerVariable).value()
+      tape.watch(value)
+    return value
+  def assign(self, value, use_locking=False, name=None, read_value=True):
+    self._maybe_create_per_worker_vars()
+    tfprint = tf.print("PerWorkerVariable:", value, use_locking, name, read_value)
+    with tf.control_dependencies([tfprint]):
+      pass
+    with ops.device(self._coordinator_instance.device):
+      return self._coordinator_instance.assign(
+        value, use_locking=use_locking, name=name, read_value=read_value)
 
-class TrainableWrapper(resource_variable_ops.ResourceVariable):
+  def assign_add(self, delta, use_locking=False, name=None, read_value=True):
+    self._maybe_create_per_worker_vars()
+    with ops.device(self._coordinator_instance.device):
+      return self._coordinator_instance.assign_add(
+        delta, use_locking=use_locking, name=name, read_value=read_value)
+
+class TrainableWrapper(TrainablePerWorker):
   """
     This class is a trainable wrapper of Dynamic Embedding,
     and the key role is recording the map relation between params and ids.
@@ -130,10 +168,11 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
   def __getattribute__(self, name):
     if name in ["sparse_read", "gather_nd"]:
       raise AttributeError("no such method: {}".format(name))
-    return super(resource_variable_ops.ResourceVariable,
+
+    return super(ps_values.PerWorkerVariable,
                  self).__getattribute__(name)
 
-  def __init__(self, params, ids, max_norm, *args, **kwargs):
+  def __init__(self, *args, **kwargs):
     """Creates an empty `TrainableWrapper` object.©
 
         Creates a group of tables placed on devices,
@@ -149,16 +188,24 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
         Returns:
           A `TrainableWrapper` object which is a subclass of ResourceVariable.
         """
-    self.params = params
-    self.ids = ids
+    self.params = kwargs.get("params")
+    self.ids = kwargs.get("ids")
     self.exists = None
-    self.max_norm = max_norm
+    self.max_norm = kwargs.get("max_norm")
     self.prefetch_values_op = None
     self.model_mode = kwargs.get("model_mode")
     kwargs.pop("model_mode")
     self._tracked_slots = []
     self._optimizer_vars = data_structures.NoDependency([])
-    super(TrainableWrapper, self).__init__(*args, **kwargs)
+    printop = tf.print("st_b:", kwargs, args,
+      output_stream=tf.compat.v1.logging.error)
+    with tf.control_dependencies([printop]):
+      pass
+    # strategy = kwargs.pop("distribute_strategy")
+    # next_creator = kwargs.pop("next_creator", None)
+    super(TrainableWrapper, self).__init__(**kwargs)
+    self._trainable = kwargs.get("trainable", True)
+    self._handle = self.handle
 
   def prefetch_values(self, update=False):
     if update or (self.prefetch_values_op is None):
@@ -172,11 +219,11 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
   def __repr__(self):
     if context.executing_eagerly() and not self._in_graph_mode:
       return "<tf.Variable '%s' shape=%s dtype=%s, numpy=%s>" % (
-          self.name, self.get_shape(), self.dtype.name,
-          ops.numpy_text(self.read_value(), is_repr=True))
+        self.name, self.get_shape(), self.dtype.name,
+        ops.numpy_text(self.read_value(), is_repr=True))
     else:
       return "<tf.Variable '%s' shape=%s dtype=%s>" % (
-          self.name, self.get_shape(), self.dtype.name)
+        self.name, self.get_shape(), self.dtype.name)
 
   def _init_from_args(self,
                       initial_value=None,
@@ -253,11 +300,11 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
         @end_compatibility
         """
     (
-        synchronization,
-        aggregation,
-        trainable,
+      synchronization,
+      aggregation,
+      trainable,
     ) = variables.validate_synchronization_aggregation_trainable(
-        synchronization, aggregation, trainable, name)
+      synchronization, aggregation, trainable, name)
     if initial_value is None:
       raise ValueError("initial_value must be specified.")
     init_from_fn = callable(initial_value)
@@ -275,8 +322,8 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
       collections = [ops.GraphKeys.GLOBAL_VARIABLES]
     if not isinstance(collections, (list, tuple, set)):
       raise ValueError(
-          "collections argument to Variable constructor must be a list, tuple, "
-          "or set. Got %s of type %s" % (collections, type(collections)))
+        "collections argument to Variable constructor must be a list, tuple, "
+        "or set. Got %s of type %s" % (collections, type(collections)))
     if constraint is not None and not callable(constraint):
       raise ValueError("The `constraint` argument must be a callable.")
 
@@ -314,48 +361,48 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
         device_context_manager = (ops.device if self._in_graph_mode else
                                   ops.NullContextmanager)
         attr = attr_value_pb2.AttrValue(list=attr_value_pb2.AttrValue.ListValue(
-            s=[compat.as_bytes("loc:@%s" % handle_name)]))
+          s=[compat.as_bytes("loc:@%s" % handle_name)]))
         with ops.get_default_graph()._attr_scope({"_class": attr}):
           with ops.name_scope("Initializer"), device_context_manager(None):
             initial_value = ops.convert_to_tensor(
-                initial_value() if init_from_fn else initial_value,
-                name="initial_value",
-                dtype=dtype,
+              initial_value() if init_from_fn else initial_value,
+              name="initial_value",
+              dtype=dtype,
             )
           if shape is None:
             shape = initial_value.shape
           handle = resource_variable_ops.eager_safe_variable_handle(
-              initial_value=initial_value,
-              shape=None,  # shape,
-              shared_name=shared_name,
-              name=name,
-              graph_mode=self._in_graph_mode,
+            initial_value=initial_value,
+            shape=None,  # shape,
+            shared_name=shared_name,
+            name=name,
+            graph_mode=self._in_graph_mode,
           )
         # pylint: disable=protected-access
         if (self._in_graph_mode and initial_value is not None
             and initial_value.op._get_control_flow_context() is not None):
           raise ValueError(
-              "Initializer for variable %s is from inside a control-flow "
-              "construct, such as a loop or conditional. When creating a "
-              "variable inside a loop or conditional, use a lambda as the "
-              "initializer." % name)
+            "Initializer for variable %s is from inside a control-flow "
+            "construct, such as a loop or conditional. When creating a "
+            "variable inside a loop or conditional, use a lambda as the "
+            "initializer." % name)
         # pylint: enable=protected-access
         dtype = initial_value.dtype.base_dtype
 
         if self._in_graph_mode:
           with ops.name_scope("IsInitialized"):
             is_initialized_op = (
-                gen_resource_variable_ops.var_is_initialized_op(handle))
+              gen_resource_variable_ops.var_is_initialized_op(handle))
           if initial_value is not None:
             # pylint: disable=g-backslash-continuation
             with ops.name_scope("Assign") as n, ops.colocate_with(
                 None, ignore_existing=True), ops.device(handle.device):
               # pylint: disable=protected-access
               initializer_op = gen_resource_variable_ops.assign_variable_op(
-                  handle,
-                  variables._try_guard_against_uninitialized_dependencies(
-                      name, initial_value),
-                  name=n,
+                handle,
+                variables._try_guard_against_uninitialized_dependencies(
+                  name, initial_value),
+                name=n,
               )
               # pylint: enable=protected-access
             # pylint: enable=g-backslash-continuation
@@ -364,14 +411,14 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
             # messages.
             with ops.device(handle.device):
               with ops.control_dependencies([
-                  gen_resource_variable_ops.assign_variable_op(
-                      handle,
-                      self.prefetch_values(),
-                      name="AssignBeforeInitRead",
-                  )
+                gen_resource_variable_ops.assign_variable_op(
+                  handle,
+                  self.prefetch_values(),
+                  name="AssignBeforeInitRead",
+                )
               ]):
                 value = gen_resource_variable_ops.read_variable_op(
-                    handle, dtype)
+                  handle, dtype)
             graph_element = value
             if caching_device is not None:
               # Variables may be created in a tf.device() or ops.colocate_with()
@@ -394,14 +441,14 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
           if caching_device:
             with ops.device(caching_device):
               with ops.control_dependencies([
-                  gen_resource_variable_ops.assign_variable_op(
-                      handle,
-                      self.prefetch_values(),
-                      name="AssignBeforeInitRead",
-                  )
+                gen_resource_variable_ops.assign_variable_op(
+                  handle,
+                  self.prefetch_values(),
+                  name="AssignBeforeInitRead",
+                )
               ]):
                 cached_value = (gen_resource_variable_ops.read_variable_op(
-                    handle, dtype))
+                  handle, dtype))
           else:
             cached_value = None
         if not context.executing_eagerly():
@@ -412,23 +459,23 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
         elif ops.GraphKeys.GLOBAL_STEP in collections:
           ops.add_to_collections(ops.GraphKeys.GLOBAL_STEP, self)
       initial_value = initial_value if self._in_graph_mode else None
-      super(resource_variable_ops.ResourceVariable, self).__init__(
-          trainable=trainable,
-          shape=shape,
-          dtype=dtype,
-          handle=handle,
-          synchronization=synchronization,
-          constraint=constraint,
-          aggregation=aggregation,
-          distribute_strategy=distribute_strategy,
-          name=name,
-          unique_id=unique_id,
-          handle_name=handle_name,
-          graph_element=graph_element,
-          initial_value=initial_value,
-          initializer_op=initializer_op,
-          is_initialized_op=is_initialized_op,
-          cached_value=cached_value,
+      super(ps_values.PerWorkerVariable, self).__init__(
+        trainable=trainable,
+        shape=shape,
+        dtype=dtype,
+        handle=handle,
+        synchronization=synchronization,
+        constraint=constraint,
+        aggregation=aggregation,
+        distribute_strategy=distribute_strategy,
+        name=name,
+        unique_id=unique_id,
+        handle_name=handle_name,
+        graph_element=graph_element,
+        initial_value=initial_value,
+        initializer_op=initializer_op,
+        is_initialized_op=is_initialized_op,
+        cached_value=cached_value,
       )
 
   def update_op(self, v0=None):
@@ -454,16 +501,16 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
     if self.model_mode == "train":
       if do_prefetch:
         with ops.control_dependencies([
-            gen_resource_variable_ops.assign_variable_op(
-                self._handle,
-                self.prefetch_values(),
-                name="AssignBeforeReadVariable")
+          gen_resource_variable_ops.assign_variable_op(
+            self._handle,
+            self.prefetch_values(),
+            name="AssignBeforeReadVariable")
         ]):
           _result = gen_resource_variable_ops.read_variable_op(
-              self._handle, self._dtype)
+            self._handle, self._dtype)
       else:
         _result = gen_resource_variable_ops.read_variable_op(
-            self._handle, self._dtype)
+          self._handle, self._dtype)
     else:
       _result = self.prefetch_values()
 
@@ -509,10 +556,10 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
     ids_rank, ids_static = _rank(ids)
     params_rank, params_static = _rank(params)
     return clip_ops.clip_by_norm(
-        params,
-        max_norm,
-        axes=(list(range(ids_rank, params_rank)) if ids_static and params_static
-              else math_ops.range(ids_rank, params_rank)),
+      params,
+      max_norm,
+      axes=(list(range(ids_rank, params_rank)) if ids_static and params_static
+            else math_ops.range(ids_rank, params_rank)),
     )
 
   def transform(self, result):
@@ -523,8 +570,8 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
   def _track_optimizer_slots(self, slots):
     if not all(isinstance(s, TrainableWrapper) for s in slots):
       raise TypeError(
-          'Can only track TrainableWrapper slots, but get {}'.format(
-              [type(s) for s in slots]))
+        'Can only track TrainableWrapper slots, but get {}'.format(
+          [type(s) for s in slots]))
     identifiers = [optimizer_v2._var_key(s) for s in self._tracked_slots]
     for s in slots:
       if optimizer_v2._var_key(s) not in identifiers:

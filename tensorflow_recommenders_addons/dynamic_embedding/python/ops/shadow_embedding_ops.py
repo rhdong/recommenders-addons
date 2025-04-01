@@ -74,12 +74,7 @@ class ShadowVariable(EmbeddingWeights, TrainableWrapper):
   and [tf.function](https://www.tensorflow.org/guide/function).
   """
 
-  def __init__(self,
-               params,
-               name='ShadowVariable',
-               max_norm=None,
-               trainable=True,
-               distribute_strategy=None,
+  def __init__(self, next_creator,
                **kwargs):
     """
     Create a ShadowVariable object.
@@ -106,11 +101,16 @@ class ShadowVariable(EmbeddingWeights, TrainableWrapper):
     if not context.executing_eagerly():
       raise NotImplementedError('Currently ShadowVariable is only allowed'
                                 ' in eager mode.')
-
+    name = kwargs.get("name", 'ShadowVariable')
+    params = kwargs.get("params")
+    distribute_strategy = kwargs.get("distribute_strategy", None)
+    max_norm = kwargs.get("max_norm", None)
+    trainable = kwargs.get("trainable", True)
     self._name = name
-    if not isinstance(params, de.Variable):
-      raise TypeError('params must be de.Variable, but get %s' % type(params))
     self.params = params
+    if not isinstance(self.params, de.Variable):
+      raise TypeError('params must be de.Variable, but get %s' % type(params))
+
     collections = kwargs.get('collections', None)
     ids = kwargs.get('ids', None)
     if ids is not None:
@@ -143,18 +143,27 @@ class ShadowVariable(EmbeddingWeights, TrainableWrapper):
     if (distribute_strategy is not None) and (not isinstance(
         distribute_strategy, distribute_lib.StrategyBase)):
       raise TypeError('distribute_strategy must inherit from StrategyBase.')
-
+    printop = tf.print("st_a:", self.params,
+                       output_stream=tf.compat.v1.logging.error)
+    with tf.control_dependencies([printop]):
+      pass
     super(ShadowVariable,
-          self).__init__(self.params,
-                         self.ids,
+          self).__init__(params=self.params,
+                         ids=self.ids,
                          max_norm=max_norm,
                          initial_value=initial_value,
                          dtype=self.params.value_dtype,
                          trainable=trainable,
                          collections=collections,
                          model_mode=model_mode,
+                         strategy=distribute_strategy,
+                         next_creator=next_creator,
                          distribute_strategy=distribute_strategy,
                          name=name)
+    printop = tf.print("st_c:", self.params,
+                       output_stream=tf.compat.v1.logging.error)
+    with tf.control_dependencies([printop]):
+      pass
     exists = kwargs.get('exists', None)
     exists_name = self._name + '-exists'
     if exists is None:
@@ -167,6 +176,12 @@ class ShadowVariable(EmbeddingWeights, TrainableWrapper):
       self._track_trackable(self.exists, exists_name, overwrite=False)
     else:
       self.exists = exists
+
+    printop = tf.print("st_d:", self.params,
+                       output_stream=tf.compat.v1.logging.error)
+    with tf.control_dependencies([printop]):
+      pass
+
     self.params._trainable_store[name] = self
 
   def verify_embedding_weights(self, sparse_ids, sparse_weights=None):
@@ -278,14 +293,13 @@ def embedding_lookup(
   with ops.name_scope(name, "shadow_embedding_lookup"):
     with ops.colocate_with(None, ignore_existing=True):
       if de.ModelMode.CURRENT_SETTING == de.ModelMode.TRAIN:
-        tfprint = tf.print("ids_8b:", shadow_.ids, ids, output_stream=tf.compat.v1.logging.error)
-        with tf.control_dependencies([tfprint]):
-          pass
+        # tfprint = tf.print("ids_8b:", shadow_.ids, ids, output_stream=tf.compat.v1.logging.error)
+        # with tf.control_dependencies([tfprint]):
+        #   pass
         with ops.control_dependencies([shadow_._reset_ids(ids)]):
           result = shadow_.read_value(do_prefetch=True)
       else:
         result = shadow_.params.lookup(ids)
-
       return result
 
 

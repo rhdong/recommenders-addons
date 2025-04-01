@@ -27,6 +27,7 @@ from tensorflow_recommenders_addons.dynamic_embedding.python.ops import dynamic_
 
 from tensorflow.python.keras.utils import tf_utils
 
+from tensorflow_recommenders_addons.dynamic_embedding.python.ops.parameter_server import create_ps_shadow_variable
 from tensorflow_recommenders_addons.dynamic_embedding.python.ops.shadow_embedding_ops import HvdVariable
 from tensorflow_recommenders_addons.dynamic_embedding.python.train.utils import \
   is_parameter_server_strategy
@@ -246,11 +247,11 @@ class Embedding(Layer):
       else:
         if is_parameter_server_strategy(self.distribute_strategy):
           self.shadow_impl = tf_utils.ListWrapper([
-              de.shadow_ops.ShadowVariable(
-                  self.params,
+            create_ps_shadow_variable(
+                  params=self.params,
                   name=shadow_name,
                   max_norm=self.max_norm,
-                  distribute_strategy=self.distribute_strategy,
+              strategy=self.distribute_strategy,
                   trainable=trainable)
           ])
         else:
@@ -303,12 +304,15 @@ class Embedding(Layer):
     Returns:
       A embedding output with shape (shape(ids), embedding_size).
     """
-    tfprint = tf.print("ids_8a:", ids, output_stream=tf.compat.v1.logging.error)
-    with tf.control_dependencies([tfprint]):
-      pass
-    return de.shadow_ops.embedding_lookup_unique(self.shadow, ids,
+
+    r = de.shadow_ops.embedding_lookup_unique(self.shadow, ids,
                                                  self.embedding_size,
                                                  self.with_unique, self.name)
+
+    tfprint = tf.print("ids_8a:", r, ids, self.shadow.ids,  output_stream=tf.compat.v1.logging.error)
+    with tf.control_dependencies([tfprint]):
+      pass
+    return r
 
   def get_config(self):
     _initializer = self.params.initializer
