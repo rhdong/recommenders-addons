@@ -2,14 +2,14 @@
 import os
 import sys
 
+import tensorflow as tf
+
+from tensorflow_recommenders_addons import dynamic_embedding as de
 from tensorflow.python.distribute import multi_process_lib
 import multiprocessing
-import tensorflow as tf
 from tensorflow.python.framework import constant_op
 
 from tensorflow.python.training import server_lib
-
-from tensorflow_recommenders_addons import dynamic_embedding as de
 
 import numpy as np
 from tensorflow.python.compat import v2_compat
