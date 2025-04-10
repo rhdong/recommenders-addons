@@ -29,7 +29,7 @@ from tensorflow.python.training.saver import BaseSaverBuilder
 from tensorflow_recommenders_addons.utils.resource_loader import LazySO
 from tensorflow_recommenders_addons.utils.resource_loader import prefix_op_name
 
-redis_table_ops = LazySO("dynamic_embedding/core/_redis_table_ops.so").ops
+redis_table_ops = None # LazySO("dynamic_embedding/core/_redis_table_ops.so").ops
 
 
 class RedisTable(LookupInterface):
