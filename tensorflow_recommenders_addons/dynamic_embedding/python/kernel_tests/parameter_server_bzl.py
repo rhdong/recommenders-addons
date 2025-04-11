@@ -1,4 +1,3 @@
-# pytest: skip
 import os
 import sys
 
