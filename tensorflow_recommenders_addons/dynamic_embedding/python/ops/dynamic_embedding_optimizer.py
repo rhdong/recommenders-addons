@@ -166,6 +166,8 @@ def DynamicEmbeddingOptimizer(self, bp_v2=False, synchronous=False, **kwargs):
         else:
           return update_op
       else:
+        raise RuntimeError(
+            "here is a var for de optimize.")
         if not var.params.trainable:
           return control_flow_ops.no_op()
 
