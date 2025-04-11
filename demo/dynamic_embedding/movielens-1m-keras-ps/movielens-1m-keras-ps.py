@@ -12,6 +12,7 @@ except:
   from tensorflow.keras.optimizers import Adagrad
 
 from tensorflow import distribute as tf_dist
+tf.debugging.set_log_device_placement(True)
 
 flags = tf.compat.v1.app.flags
 FLAGS = flags.FLAGS
