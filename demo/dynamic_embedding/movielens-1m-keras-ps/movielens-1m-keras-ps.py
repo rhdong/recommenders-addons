@@ -12,7 +12,7 @@ except:
   from tensorflow.keras.optimizers import Adagrad
 
 from tensorflow import distribute as tf_dist
-tf.debugging.set_log_device_placement(True)
+//tf.debugging.set_log_device_placement(True)
 
 flags = tf.compat.v1.app.flags
 FLAGS = flags.FLAGS
@@ -181,7 +181,8 @@ class Runner():
         model.load_weights(self.model_dir)
 
     model.fit(dataset, epochs=self.epochs, steps_per_epoch=self.steps_per_epoch)
-    print(f"model: {model.trainable_variables}")
+    for op in model.trainable_variables:
+      print(f"Variable debug: {op.name}, Device: {op.device}")
     if self.model_dir:
       save_options = tf.saved_model.SaveOptions(namespace_whitelist=['TFRA'])
       model.save(self.model_dir, options=save_options)
